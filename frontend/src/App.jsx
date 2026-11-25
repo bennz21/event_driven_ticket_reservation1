@@ -4,6 +4,9 @@ import SeatMap from './components/SeatMap';
 import HoldTimer from './components/HoldTimer';
 import CheckoutModal from './components/CheckoutModal';
 import ActivityFeed from './components/ActivityFeed';
+import AuthModal from './components/AuthModal';
+import MyTicketsModal from './components/MyTicketsModal';
+import HomeScreen from './components/HomeScreen';
 import {
   getSessionId,
   fetchEvents,
@@ -11,6 +14,10 @@ import {
   holdSeats,
   releaseSeats,
   confirmReservation,
+  fetchCurrentUser,
+  setStoredToken,
+  logoutAccount,
+  exchangeOAuthCode,
 } from './api/client';
 import { useEventWebSocket } from './hooks/useEventWebSocket';
 import { Calendar, MapPin, DollarSign, Sparkles } from 'lucide-react';
@@ -25,9 +32,53 @@ export default function App() {
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [completedReservation, setCompletedReservation] = useState(null);
+  const [user, setUser] = useState(null);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [authModalMode, setAuthModalMode] = useState('login');
+  const [oauthBannerError, setOauthBannerError] = useState('');
+  const [isMyTicketsOpen, setIsMyTicketsOpen] = useState(false);
+  const [activeView, setActiveView] = useState('home');
 
   // Real-time WebSocket hook
   const { isConnected, lastMessage, eventFeed } = useEventWebSocket(selectedEventId);
+
+  // Restore authenticated user or complete OAuth redirect callback
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const oauthCode = params.get('oauth_code');
+    const oauthError = params.get('oauth_error');
+
+    if (oauthCode || oauthError) {
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+
+    if (oauthCode) {
+      exchangeOAuthCode(oauthCode)
+        .then((res) => {
+          setStoredToken(res.access_token);
+          setUser(res.user);
+          setActiveView('workspace');
+        })
+        .catch((err) => {
+          setOauthBannerError(err.message || 'Social sign-in failed');
+          setAuthModalMode('login');
+          setIsAuthModalOpen(true);
+        });
+      return;
+    }
+
+    if (oauthError) {
+      setOauthBannerError(oauthError);
+      setAuthModalMode('login');
+      setIsAuthModalOpen(true);
+    }
+
+    fetchCurrentUser().then((u) => {
+      if (u) {
+        setUser(u);
+      }
+    });
+  }, []);
 
   // Load initial events
   useEffect(() => {
@@ -202,14 +253,53 @@ export default function App() {
     }
   };
 
+  const handleAuthSuccess = (authResponse) => {
+    setStoredToken(authResponse.access_token);
+    setUser(authResponse.user);
+    setOauthBannerError('');
+    setActiveView('workspace');
+  };
+
+  const handleLogout = async () => {
+    await logoutAccount();
+    setUser(null);
+    setActiveView('home');
+  };
+
+  const openAuthModal = (mode) => {
+    setOauthBannerError('');
+    setAuthModalMode(mode);
+    setIsAuthModalOpen(true);
+  };
+
+  const availableSeatsCount = seats.filter((s) => s.status === 'available').length;
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col">
       <Navbar
         isConnected={isConnected}
         sessionId={sessionId}
         onResetSession={handleResetSession}
+        user={user}
+        onOpenAuth={openAuthModal}
+        onOpenMyTickets={() => setIsMyTicketsOpen(true)}
+        onLogout={handleLogout}
+        activeView={activeView}
+        onNavigate={setActiveView}
       />
 
+      {activeView === 'home' ? (
+        <main className="flex-1">
+          <HomeScreen
+            featuredEvent={currentEvent}
+            availableSeatsCount={availableSeatsCount}
+            totalSeatsCount={seats.length}
+            user={user}
+            onOpenAuth={openAuthModal}
+            onEnterWorkspace={() => setActiveView('workspace')}
+          />
+        </main>
+      ) : (
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
         {/* Event Header Banner */}
         {currentEvent && (
@@ -283,6 +373,7 @@ export default function App() {
           </div>
         </div>
       </main>
+      )}
 
       {/* Checkout Modal */}
       <CheckoutModal
@@ -298,6 +389,26 @@ export default function App() {
         onConfirm={handleConfirmReservation}
         isSubmitting={isSubmitting}
         completedReservation={completedReservation}
+        user={user}
+      />
+
+      {/* Auth Modal (Email, Google, Apple) */}
+      <AuthModal
+        isOpen={isAuthModalOpen}
+        initialMode={authModalMode}
+        onClose={() => {
+          setIsAuthModalOpen(false);
+          setOauthBannerError('');
+        }}
+        onAuthSuccess={handleAuthSuccess}
+        externalError={oauthBannerError}
+      />
+
+      {/* User's Confirmed Tickets */}
+      <MyTicketsModal
+        isOpen={isMyTicketsOpen}
+        onClose={() => setIsMyTicketsOpen(false)}
+        user={user}
       />
     </div>
   );

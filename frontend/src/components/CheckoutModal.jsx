@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { X, CheckCircle2, Ticket, QrCode } from 'lucide-react';
 
 export default function CheckoutModal({
@@ -8,9 +8,18 @@ export default function CheckoutModal({
   onConfirm,
   isSubmitting,
   completedReservation,
+  user,
 }) {
   const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (!isOpen) return;
+    setName((prev) => prev || user?.full_name || '');
+    setEmail((prev) => prev || user?.email || '');
+    setError('');
+  }, [isOpen, user]);
 
   if (!isOpen) return null;
 
@@ -24,7 +33,7 @@ export default function CheckoutModal({
     }
     setError('');
     try {
-      await onConfirm({ name: name.trim(), email: '' });
+      await onConfirm({ name: name.trim(), email: email.trim() });
     } catch (err) {
       setError(err.message || 'Checkout failed');
     }
@@ -143,6 +152,19 @@ export default function CheckoutModal({
                   placeholder="e.g. Alex Mercer"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-slate-300 mb-1.5">
+                  Email (optional for ticket receipt)
+                </label>
+                <input
+                  type="email"
+                  placeholder="alex@example.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
                   className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
                 />
               </div>

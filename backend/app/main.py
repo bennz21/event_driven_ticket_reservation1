@@ -4,6 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.core.events import get_event_bus, DomainEvent
+from app.core.redis import redis_service
 from app.core.websocket_manager import ws_manager
 from app.services.background_worker import cleanup_worker
 from app.db.init_db import init_database
@@ -33,6 +34,8 @@ async def lifespan(app: FastAPI):
     logger.info("Initializing database and seeding demo data...")
     await init_database()
 
+    await redis_service.connect()
+
     event_bus = get_event_bus()
     await event_bus.start()
     # Subscribe websocket broadcaster to all domain events
@@ -48,6 +51,7 @@ async def lifespan(app: FastAPI):
     logger.info("Initiating graceful shutdown...")
     await cleanup_worker.stop()
     await event_bus.stop()
+    await redis_service.disconnect()
     logger.info("Shutdown complete.")
 
 app = FastAPI(
@@ -75,4 +79,7 @@ async def health_check():
         "status": "healthy",
         "service": settings.PROJECT_NAME,
         "event_bus": "redis" if settings.USE_REDIS_EVENT_BUS else "in-memory",
+        "redis": "connected" if redis_service.is_available else "unavailable",
+        "seat_locking": "redis" if redis_service.locking_enabled else "database",
+        "seat_cache": "redis" if redis_service.caching_enabled else "disabled",
     }

@@ -1,5 +1,5 @@
 import datetime
-from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, Enum as SQLEnum, Index
+from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, Enum as SQLEnum, Index, Boolean
 from sqlalchemy.orm import relationship
 from app.core.database import Base
 import enum
@@ -14,6 +14,27 @@ class ReservationStatus(str, enum.Enum):
     CONFIRMED = "confirmed"
     EXPIRED = "expired"
     CANCELLED = "cancelled"
+
+class User(Base):
+    __tablename__ = "users"
+
+    id = Column(Integer, primary_key=True, index=True)
+    email = Column(String(255), unique=True, nullable=True, index=True)
+    full_name = Column(String(150), nullable=False)
+    password_hash = Column(String(255), nullable=True)
+    auth_provider = Column(String(30), default="local", nullable=False, index=True)
+    provider_user_id = Column(String(255), nullable=True, index=True)
+    avatar_url = Column(String(500), nullable=True)
+    is_active = Column(Boolean, default=True, nullable=False)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
+
+    reservations = relationship("Reservation", back_populates="user")
+
+    __table_args__ = (
+        Index("ix_user_provider_sub", "auth_provider", "provider_user_id", unique=True),
+    )
+
 
 class Event(Base):
     __tablename__ = "events"
@@ -61,6 +82,7 @@ class Reservation(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     event_id = Column(Integer, ForeignKey("events.id"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
     session_id = Column(String(100), nullable=False, index=True)
     customer_name = Column(String(150), nullable=False)
     customer_email = Column(String(150), nullable=True, default="")
@@ -70,6 +92,7 @@ class Reservation(Base):
 
     # Relationships
     event = relationship("Event", back_populates="reservations")
+    user = relationship("User", back_populates="reservations")
     tickets = relationship("Ticket", back_populates="reservation", cascade="all, delete-orphan")
 
 class Ticket(Base):

@@ -2,6 +2,7 @@ import asyncio
 from app.core.database import engine
 from sqlalchemy import text
 from app.core.events import get_event_bus, DomainEvent, EventType
+from app.core.redis import redis_service
 
 async def reset_seats():
     print("Resetting all seats in main_reservation...")
@@ -10,6 +11,11 @@ async def reset_seats():
             text("UPDATE seats SET status = 'available', held_by_session_id = NULL, held_until = NULL;")
         )
         print(f"-> Successfully updated {result.rowcount} seats to 'available'!")
+
+    if await redis_service.connect():
+        await redis_service.force_release_seat_locks(1, list(range(1, 61)))
+        await redis_service.invalidate_seat_map(1)
+        await redis_service.disconnect()
 
     # Optionally broadcast event so UI updates immediately without browser refresh
     try:

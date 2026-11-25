@@ -1,16 +1,28 @@
 import datetime
 import logging
-from sqlalchemy import select
+from sqlalchemy import inspect, select, text
 from app.core.database import engine, Base, AsyncSessionLocal
-from app.models import Event, Seat, SeatStatus
+from app.models import Event, Seat, SeatStatus, User
 
 logger = logging.getLogger("init_db")
+
+
+def _ensure_schema_columns(sync_conn) -> None:
+    """Safely adds new nullable columns to existing tables when upgrading in place."""
+    inspector = inspect(sync_conn)
+    if "reservations" in inspector.get_table_names():
+        columns = {col["name"] for col in inspector.get_columns("reservations")}
+        if "user_id" not in columns:
+            sync_conn.execute(text("ALTER TABLE reservations ADD COLUMN user_id INTEGER NULL"))
+            logger.info("Added 'user_id' column to existing 'reservations' table.")
+
 
 async def init_database():
     """Initializes tables and seeds initial demo data if the DB is empty."""
     async with engine.begin() as conn:
         # Create all tables if they don't exist
         await conn.run_sync(Base.metadata.create_all)
+        await conn.run_sync(_ensure_schema_columns)
 
     async with AsyncSessionLocal() as session:
         # Check if events already exist

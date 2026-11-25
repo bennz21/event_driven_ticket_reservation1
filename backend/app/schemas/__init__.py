@@ -1,7 +1,88 @@
 import datetime
-from typing import List, Optional
-from pydantic import BaseModel
+import re
+from typing import List, Literal, Optional
+from pydantic import BaseModel, field_validator
 from app.models import SeatStatus, ReservationStatus
+
+_EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+
+
+# --- Auth & User Schemas ---
+class UserRegisterRequest(BaseModel):
+    full_name: str
+    email: str
+    password: str
+
+    @field_validator("full_name")
+    @classmethod
+    def validate_full_name(cls, v: str) -> str:
+        cleaned = v.strip()
+        if len(cleaned) < 2:
+            raise ValueError("Full name must be at least 2 characters.")
+        return cleaned
+
+    @field_validator("email")
+    @classmethod
+    def validate_email(cls, v: str) -> str:
+        cleaned = v.strip().lower()
+        if not _EMAIL_RE.match(cleaned):
+            raise ValueError("Please provide a valid email address.")
+        return cleaned
+
+    @field_validator("password")
+    @classmethod
+    def validate_password(cls, v: str) -> str:
+        if len(v) < 8:
+            raise ValueError("Password must be at least 8 characters.")
+        return v
+
+
+class UserLoginRequest(BaseModel):
+    email: str
+    password: str
+
+    @field_validator("email")
+    @classmethod
+    def normalize_email(cls, v: str) -> str:
+        return v.strip().lower()
+
+
+class UserResponse(BaseModel):
+    id: int
+    email: Optional[str] = None
+    full_name: str
+    auth_provider: str
+    avatar_url: Optional[str] = None
+    created_at: datetime.datetime
+
+    class Config:
+        from_attributes = True
+
+
+class AuthTokenResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    user: UserResponse
+
+
+class OAuthExchangeRequest(BaseModel):
+    code: str
+
+
+class OAuthDemoRequest(BaseModel):
+    provider: Literal["google", "apple"]
+    email: Optional[str] = None
+    full_name: Optional[str] = None
+
+
+class OAuthProviderStatus(BaseModel):
+    configured: bool
+    demo_enabled: bool
+
+
+class AuthProvidersResponse(BaseModel):
+    google: OAuthProviderStatus
+    apple: OAuthProviderStatus
 
 # --- Event Schemas ---
 class EventBase(BaseModel):
@@ -73,6 +154,7 @@ class TicketResponse(BaseModel):
 class ReservationResponse(BaseModel):
     id: int
     event_id: int
+    user_id: Optional[int] = None
     customer_name: str
     customer_email: Optional[str] = ""
     total_amount: float

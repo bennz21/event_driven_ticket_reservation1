@@ -147,11 +147,21 @@ class RedisEventBus(BaseEventBus):
         self._running = False
         if self._listener_task:
             self._listener_task.cancel()
+            try:
+                await self._listener_task
+            except asyncio.CancelledError:
+                pass
         if self._pubsub:
             await self._pubsub.punsubscribe("events:*")
-            await self._pubsub.close()
+            if hasattr(self._pubsub, "aclose"):
+                await self._pubsub.aclose()
+            else:
+                await self._pubsub.close()
         if self._client:
-            await self._client.close()
+            if hasattr(self._client, "aclose"):
+                await self._client.aclose()
+            else:
+                await self._client.close()
         logger.info("RedisEventBus stopped.")
 
 # Factory function to get the configured event bus

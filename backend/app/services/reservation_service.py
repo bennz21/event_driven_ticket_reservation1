@@ -1,12 +1,13 @@
 import datetime
 import uuid
-from typing import List
+from typing import List, Optional
 from fastapi import HTTPException, status
 from sqlalchemy import select, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from app.models import Seat, SeatStatus, Reservation, ReservationStatus, Ticket
 from app.core.events import get_event_bus, DomainEvent, EventType
+from app.core.redis import redis_service
 
 class ReservationService:
     def __init__(self, db: AsyncSession):
@@ -20,12 +21,19 @@ class ReservationService:
         session_id: str,
         customer_name: str,
         customer_email: str = "",
+        user_id: Optional[int] = None,
     ) -> Reservation:
         """
         Validates held seats for session and converts them into confirmed Reservation & Tickets.
         Publishes RESERVATION_CONFIRMED event to the event bus.
         """
         now = datetime.datetime.utcnow()
+
+        if not await redis_service.verify_seat_locks_not_stolen(event_id, seat_ids, session_id):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="One or more selected seats are currently locked by another session.",
+            )
 
         # Query seats locked by this session
         query = select(Seat).where(
@@ -61,6 +69,7 @@ class ReservationService:
         # Create Reservation
         reservation = Reservation(
             event_id=event_id,
+            user_id=user_id,
             session_id=session_id,
             customer_name=customer_name,
             customer_email=customer_email,
@@ -88,6 +97,8 @@ class ReservationService:
             tickets.append(ticket)
 
         await self.db.commit()
+        await redis_service.force_release_seat_locks(event_id, seat_ids)
+        await redis_service.invalidate_seat_map(event_id)
 
         # Re-query with eagerly loaded tickets
         res_query = (

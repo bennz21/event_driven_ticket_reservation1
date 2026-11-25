@@ -5,6 +5,7 @@ from sqlalchemy import select, and_, not_
 from app.core.database import AsyncSessionLocal
 from app.models import Seat, SeatStatus, Ticket
 from app.core.events import get_event_bus, DomainEvent, EventType
+from app.core.redis import redis_service
 
 logger = logging.getLogger("background_worker")
 
@@ -71,6 +72,8 @@ class ExpiredHoldCleanupWorker:
 
                         event_bus = get_event_bus()
                         for event_id, seat_ids in events_map.items():
+                            await redis_service.force_release_seat_locks(event_id, seat_ids)
+                            await redis_service.invalidate_seat_map(event_id)
                             await event_bus.publish(
                                 DomainEvent(
                                     event_type=EventType.SEAT_RELEASED,
