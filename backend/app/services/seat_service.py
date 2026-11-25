@@ -1,8 +1,8 @@
 import datetime
 from typing import List, Tuple
-from sqlalchemy import select, and_, or_
+from sqlalchemy import select, and_, or_, not_
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.models import Seat, SeatStatus
+from app.models import Seat, SeatStatus, Ticket
 from app.core.config import settings
 from app.core.events import get_event_bus, DomainEvent, EventType
 
@@ -18,24 +18,42 @@ class SeatService:
         result = await self.db.execute(query)
         seats = result.scalars().all()
 
-        # Reconcile any in-flight expired holds on read
-        expired_seat_ids = []
+        # Reconcile any in-flight expired holds or orphaned reservations on read
+        reconciled_seat_ids = []
         for seat in seats:
             if seat.status == SeatStatus.HELD and seat.held_until and seat.held_until < now:
                 seat.status = SeatStatus.AVAILABLE
                 seat.held_by_session_id = None
                 seat.held_until = None
                 seat.version += 1
-                expired_seat_ids.append(seat.id)
+                reconciled_seat_ids.append(seat.id)
 
-        if expired_seat_ids:
+        # Check for orphaned reserved seats (seats marked reserved with no active ticket)
+        orphaned_query = select(Seat).where(
+            and_(
+                Seat.event_id == event_id,
+                Seat.status == SeatStatus.RESERVED,
+                not_(Seat.id.in_(select(Ticket.seat_id))),
+            )
+        )
+        orphaned_res = await self.db.execute(orphaned_query)
+        orphaned_seats = orphaned_res.scalars().all()
+        for seat in orphaned_seats:
+            seat.status = SeatStatus.AVAILABLE
+            seat.held_by_session_id = None
+            seat.held_until = None
+            seat.version += 1
+            if seat.id not in reconciled_seat_ids:
+                reconciled_seat_ids.append(seat.id)
+
+        if reconciled_seat_ids:
             await self.db.commit()
-            # Publish event for released expired seats
+            # Publish event for released seats
             await self.event_bus.publish(
                 DomainEvent(
                     event_type=EventType.SEAT_RELEASED,
                     event_model_id=event_id,
-                    payload={"seat_ids": expired_seat_ids, "reason": "expired_hold_on_read"},
+                    payload={"seat_ids": reconciled_seat_ids, "reason": "reconciled_on_read"},
                 )
             )
 
