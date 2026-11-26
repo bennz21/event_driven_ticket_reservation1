@@ -129,6 +129,7 @@ class Event(Base):
         default=ApprovalStatus.PENDING,
         index=True,
     )
+    embedding_hash = Column(String(64), nullable=True)
     created_at = Column(DateTime, nullable=False, default=datetime.datetime.utcnow)
     updated_at = Column(
         DateTime,

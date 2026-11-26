@@ -30,6 +30,11 @@ from app.schemas import (
     PaymentCheckoutRequest,
     SeatResponse,
 )
+from app.services.pinecone_service import (
+    fetch_ordered_events_by_ids,
+    get_similar_event_ids,
+    search_event_ids,
+)
 
 router = APIRouter()
 
@@ -58,17 +63,28 @@ def _fetch_full_booking(db: Session, booking_id: int) -> Booking:
 @router.get("/events", response_model=List[EventResponse])
 def browse_approved_events(
     q: Optional[str] = Query(default=None, description="Search title, description, or venue"),
+    city: Optional[str] = Query(default=None, description="Filter by venue/city"),
+    max_price: Optional[float] = Query(default=None, gt=0, description="Maximum ticket price"),
+    seating_type: Optional[str] = Query(default=None, description="Filter by seated or open"),
     db: Session = Depends(get_db),
 ):
-    """Browse and search Admin-approved events."""
+    """Browse and search Admin-approved events (MySQL primary + semantic Pinecone fallback)."""
     query = (
         select(Event)
         .options(joinedload(Event.organizer))
         .where(Event.approval_status == ApprovalStatus.APPROVED)
         .order_by(Event.event_date.asc(), Event.event_time.asc())
     )
-    if q and q.strip():
-        pattern = f"%{q.strip()}%"
+    if city and city.strip():
+        query = query.where(Event.venue.ilike(f"%{city.strip()}%"))
+    if max_price is not None:
+        query = query.where(Event.ticket_price <= Decimal(str(max_price)))
+    if seating_type in ("seated", "open"):
+        query = query.where(Event.seating_type == SeatingType(seating_type))
+
+    clean_q = q.strip() if q else ""
+    if clean_q:
+        pattern = f"%{clean_q}%"
         query = query.where(
             or_(
                 Event.title.ilike(pattern),
@@ -77,6 +93,26 @@ def browse_approved_events(
             )
         )
     events = db.execute(query).scalars().all()
+
+    # Semantic fallback only when SQL returns empty and input is meaningful (>= 3 chars)
+    if not events and len(clean_q) >= 3:
+        matched_ids = search_event_ids(
+            clean_q,
+            top_k=5,
+            city=city,
+            seating_type=seating_type,
+            max_price=max_price,
+        )
+        if matched_ids:
+            events = fetch_ordered_events_by_ids(db, matched_ids)
+            if city and city.strip():
+                city_l = city.strip().lower()
+                events = [e for e in events if city_l in (e.venue or "").lower()]
+            if max_price is not None:
+                events = [e for e in events if float(e.ticket_price) <= max_price]
+            if seating_type in ("seated", "open"):
+                events = [e for e in events if e.seating_type.value == seating_type]
+
     return [serialize_event(e) for e in events]
 
 
@@ -96,6 +132,47 @@ def get_approved_event(event_id: int, db: Session = Depends(get_db)):
             detail="Approved event not found.",
         )
     return serialize_event(event)
+
+
+@router.get("/events/{event_id}/similar", response_model=List[EventResponse])
+def get_similar_events(
+    event_id: int,
+    limit: int = Query(default=4, ge=1, le=5),
+    db: Session = Depends(get_db),
+):
+    """Return similar upcoming approved events (TTL-cached Pinecone lookup with MySQL fallback)."""
+    event = db.execute(
+        select(Event).where(
+            Event.id == event_id,
+            Event.approval_status == ApprovalStatus.APPROVED,
+        )
+    ).scalar_one_or_none()
+    if event is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Approved event not found.",
+        )
+
+    similar_ids = get_similar_event_ids(event, top_k=limit)
+    similar = fetch_ordered_events_by_ids(db, similar_ids)
+    if not similar:
+        today = datetime.date.today()
+        similar = (
+            db.execute(
+                select(Event)
+                .options(joinedload(Event.organizer))
+                .where(
+                    Event.id != event.id,
+                    Event.approval_status == ApprovalStatus.APPROVED,
+                    Event.event_date >= today,
+                )
+                .order_by(Event.event_date.asc(), Event.event_time.asc())
+                .limit(limit)
+            )
+            .scalars()
+            .all()
+        )
+    return [serialize_event(e) for e in similar]
 
 
 @router.get("/events/{event_id}/seats", response_model=List[SeatResponse])

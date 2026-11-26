@@ -30,6 +30,7 @@ CREATE TABLE IF NOT EXISTS events (
     total_tickets INT NOT NULL,
     available_tickets INT NOT NULL,
     approval_status ENUM('pending', 'approved', 'rejected') NOT NULL DEFAULT 'pending',
+    embedding_hash VARCHAR(64) NULL,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (id),

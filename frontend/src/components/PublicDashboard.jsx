@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Armchair,
   Calendar,
@@ -34,6 +34,7 @@ export default function PublicDashboard({ user }) {
   const [events, setEvents] = useState([]);
   const [bookings, setBookings] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const didMountRef = useRef(false);
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [eventSeats, setEventSeats] = useState([]);
   const [seatsLoading, setSeatsLoading] = useState(false);
@@ -66,9 +67,32 @@ export default function PublicDashboard({ user }) {
     loadData('');
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Debounced search-as-you-type: wait 400ms and skip 1-2 char inputs to avoid wasteful queries
+  useEffect(() => {
+    if (!didMountRef.current) {
+      didMountRef.current = true;
+      return;
+    }
+    const trimmed = searchQuery.trim();
+    if (trimmed.length > 0 && trimmed.length < 3) {
+      return;
+    }
+    const timer = setTimeout(() => {
+      publicBrowseEvents(trimmed)
+        .then((ev) => setEvents(ev))
+        .catch(() => {});
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
   const handleSearch = (e) => {
     e.preventDefault();
-    loadData(searchQuery);
+    const trimmed = searchQuery.trim();
+    if (trimmed.length > 0 && trimmed.length < 3) {
+      setError('Enter at least 3 characters to search, or clear the search box.');
+      return;
+    }
+    loadData(trimmed);
   };
 
   const openBookModal = async (ev) => {

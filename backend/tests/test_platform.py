@@ -36,9 +36,12 @@ class PlatformIntegrationTests(unittest.TestCase):
                 db.close()
 
         app.dependency_overrides[get_db] = override_get_db
+        self._pc_patch = patch("app.services.pinecone_service._pinecone_configured", return_value=False)
+        self._pc_patch.start()
         self.client = TestClient(app)
 
     def tearDown(self) -> None:
+        self._pc_patch.stop()
         app.dependency_overrides.clear()
         Base.metadata.drop_all(bind=self.engine)
         self.engine.dispose()

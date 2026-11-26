@@ -14,6 +14,7 @@ from app.schemas import (
     EventResponse,
     EventUpdateRequest,
 )
+from app.services.pinecone_service import compute_event_hash, delete_event_vectors
 
 router = APIRouter(dependencies=[Depends(require_organizer)])
 
@@ -133,6 +134,7 @@ def update_event(
         or req.seats_per_row != event.seats_per_row
     )
 
+    old_hash = event.embedding_hash
     event.title = req.title.strip()
     event.description = req.description.strip()
     event.event_date = req.event_date
@@ -146,6 +148,10 @@ def update_event(
     event.available_tickets = req.total_tickets - tickets_allocated
     event.approval_status = ApprovalStatus.PENDING
 
+    searchable_changed = old_hash is not None and compute_event_hash(event) != old_hash
+    if searchable_changed:
+        event.embedding_hash = None
+
     if layout_changed:
         db.execute(delete(Seat).where(Seat.event_id == event.id))
         if new_seating_type == SeatingType.SEATED and req.total_rows and req.seats_per_row:
@@ -153,6 +159,8 @@ def update_event(
 
     db.commit()
     db.refresh(event)
+    if searchable_changed:
+        delete_event_vectors([event.id])
     return serialize_event(event, actor.name)
 
 
@@ -171,8 +179,11 @@ def delete_event(
             detail="You can only delete your own events.",
         )
 
+    had_vector = bool(event.embedding_hash)
     db.delete(event)
     db.commit()
+    if had_vector:
+        delete_event_vectors([event_id])
 
 
 @router.get("/bookings", response_model=List[BookingResponse])

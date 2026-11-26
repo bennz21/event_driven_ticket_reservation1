@@ -15,6 +15,7 @@ from app.schemas import (
     UserAdminResponse,
     UserStatusUpdate,
 )
+from app.services.pinecone_service import sync_single_event
 
 router = APIRouter(dependencies=[Depends(require_admin)])
 
@@ -50,6 +51,7 @@ def approve_event(event_id: int, db: Session = Depends(get_db)):
     event.approval_status = ApprovalStatus.APPROVED
     db.commit()
     db.refresh(event)
+    sync_single_event(event, db=db)
     return serialize_event(event)
 
 
@@ -64,6 +66,7 @@ def reject_event(event_id: int, db: Session = Depends(get_db)):
     event.approval_status = ApprovalStatus.REJECTED
     db.commit()
     db.refresh(event)
+    sync_single_event(event, db=db)
     return serialize_event(event)
 
 
