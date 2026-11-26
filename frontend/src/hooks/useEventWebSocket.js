@@ -13,8 +13,15 @@ export function useEventWebSocket(eventId) {
   const connect = useCallback(() => {
     if (!eventId) return;
 
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${protocol}//${window.location.host}/api/v1/ws/events/${eventId}`;
+    let wsUrl = '';
+    const customWsUrl = import.meta.env.VITE_WS_URL;
+    if (customWsUrl) {
+      const cleanWsUrl = customWsUrl.replace(/\/+$/, '');
+      wsUrl = `${cleanWsUrl}/api/v1/ws/events/${eventId}`;
+    } else {
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      wsUrl = `${protocol}//${window.location.host}/api/v1/ws/events/${eventId}`;
+    }
 
     const ws = new WebSocket(wsUrl);
     wsRef.current = ws;

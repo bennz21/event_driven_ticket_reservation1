@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback } from 'react';
 
-const API_BASE = '/api/v1';
+const rawApiUrl = import.meta.env.VITE_API_URL || '';
+const API_BASE = rawApiUrl ? `${rawApiUrl.replace(/\/+$/, '')}/api/v1` : '/api/v1';
 
 /**
  * useChatbot
