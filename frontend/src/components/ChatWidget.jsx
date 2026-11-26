@@ -79,8 +79,8 @@ export default function ChatWidget() {
           flex items-center justify-center
           transition-all duration-300
           ${open
-            ? 'bg-slate-700 hover:bg-slate-600'
-            : 'bg-indigo-600 hover:bg-indigo-500 animate-pulse-slow'}
+            ? 'bg-[#0e1b36] border border-[#22355a] hover:bg-[#15284e]'
+            : 'bg-[#1a73e8] hover:bg-[#2b84f8] shadow-[0_0_24px_rgba(26,115,232,0.5)] animate-cta-glow'}
         `}
       >
         {open ? (
@@ -99,17 +99,17 @@ export default function ChatWidget() {
             h-[520px]
             flex flex-col
             rounded-2xl shadow-2xl
-            bg-slate-900 border border-slate-700
+            bg-[#091224] border border-[#192848]
             overflow-hidden
-            animate-slide-up
+            animate-modal-pop
           "
         >
           {/* Header */}
-          <div className="flex items-center justify-between px-4 py-3 bg-indigo-700">
+          <div className="flex items-center justify-between px-4 py-3 bg-[#124596] border-b border-[#1f3b73]">
             <div className="flex items-center gap-2">
               <Bot size={18} className="text-white" />
               <span className="text-sm font-semibold text-white">Ticket Assistant</span>
-              <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" title="Online" />
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" title="Online" />
             </div>
             <div className="flex items-center gap-2">
               {/* TTS toggle */}
@@ -118,7 +118,7 @@ export default function ChatWidget() {
                   setTtsEnabled((v) => !v);
                   if (speaking) stopSpeaking();
                 }}
-                className="text-indigo-200 hover:text-white transition-colors"
+                className="text-sky-200 hover:text-white transition-colors"
                 title={ttsEnabled ? 'Mute voice replies' : 'Enable voice replies'}
               >
                 {ttsEnabled ? <Volume2 size={16} /> : <VolumeX size={16} />}
@@ -126,7 +126,7 @@ export default function ChatWidget() {
               {/* Clear chat */}
               <button
                 onClick={clearChat}
-                className="text-indigo-200 hover:text-white transition-colors"
+                className="text-sky-200 hover:text-white transition-colors"
                 title="Clear conversation"
               >
                 <Trash2 size={15} />
@@ -134,7 +134,7 @@ export default function ChatWidget() {
               {/* Close */}
               <button
                 onClick={() => setOpen(false)}
-                className="text-indigo-200 hover:text-white transition-colors"
+                className="text-sky-200 hover:text-white transition-colors"
                 title="Close"
               >
                 <X size={16} />
@@ -154,8 +154,8 @@ export default function ChatWidget() {
                   className={`
                     flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-xs
                     ${msg.role === 'user'
-                      ? 'bg-indigo-600 text-white'
-                      : 'bg-slate-700 text-indigo-300'}
+                      ? 'bg-[#1a73e8] text-white'
+                      : 'bg-[#0e1b36] border border-[#1f3b73] text-[#60b5ff]'}
                   `}
                 >
                   {msg.role === 'user' ? <User size={14} /> : <Bot size={14} />}
@@ -166,8 +166,8 @@ export default function ChatWidget() {
                   className={`
                     max-w-[78%] px-3 py-2 rounded-2xl leading-relaxed whitespace-pre-wrap
                     ${msg.role === 'user'
-                      ? 'bg-indigo-600 text-white rounded-tr-sm'
-                      : 'bg-slate-800 text-slate-100 rounded-tl-sm'}
+                      ? 'bg-[#1a73e8] text-white rounded-tr-sm'
+                      : 'bg-[#060d1c] border border-[#172542] text-slate-100 rounded-tl-sm'}
                   `}
                 >
                   {msg.text}
@@ -178,10 +178,10 @@ export default function ChatWidget() {
             {/* Typing indicator */}
             {loading && (
               <div className="flex gap-2 items-center">
-                <div className="w-7 h-7 rounded-full bg-slate-700 flex items-center justify-center">
-                  <Bot size={14} className="text-indigo-300" />
+                <div className="w-7 h-7 rounded-full bg-[#0e1b36] border border-[#1f3b73] flex items-center justify-center">
+                  <Bot size={14} className="text-[#60b5ff]" />
                 </div>
-                <div className="bg-slate-800 px-4 py-2 rounded-2xl rounded-tl-sm flex gap-1 items-center">
+                <div className="bg-[#060d1c] border border-[#172542] px-4 py-2 rounded-2xl rounded-tl-sm flex gap-1 items-center">
                   <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce [animation-delay:0ms]" />
                   <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce [animation-delay:150ms]" />
                   <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce [animation-delay:300ms]" />
@@ -199,23 +199,23 @@ export default function ChatWidget() {
             </div>
           )}
           {speaking && (
-            <div className="px-4 py-1.5 bg-indigo-900/60 border-t border-indigo-800 text-xs text-indigo-300 flex items-center gap-2">
+            <div className="px-4 py-1.5 bg-[#0d1c3b] border-t border-[#1f3b73] text-xs text-[#60b5ff] flex items-center gap-2">
               <Volume2 size={12} />
               Speaking…
             </div>
           )}
 
           {/* Input area */}
-          <div className="px-3 py-3 border-t border-slate-700 flex gap-2 items-end">
+          <div className="px-3 py-3 border-t border-[#172542] flex gap-2 items-end">
             <textarea
               ref={inputRef}
               rows={1}
               className="
                 flex-1 resize-none text-sm
-                bg-slate-800 border border-slate-600
+                bg-[#060d1c] border border-[#1b2b4d]
                 text-slate-100 placeholder-slate-500
                 rounded-xl px-3 py-2 outline-none
-                focus:ring-2 focus:ring-indigo-500
+                focus:ring-2 focus:ring-[#2684ff]
                 max-h-28 overflow-y-auto
               "
               placeholder="Ask about events, seats…"
@@ -239,7 +239,7 @@ export default function ChatWidget() {
                   p-2 rounded-xl transition-all flex-shrink-0
                   ${listening
                     ? 'bg-red-600 text-white ring-2 ring-red-400 animate-pulse'
-                    : 'bg-slate-700 text-slate-300 hover:bg-slate-600'}
+                    : 'bg-[#0e1b36] border border-[#22355a] text-slate-300 hover:bg-[#15284e]'}
                   disabled:opacity-40
                 `}
               >
@@ -254,7 +254,7 @@ export default function ChatWidget() {
               title="Send message"
               className="
                 p-2 rounded-xl flex-shrink-0
-                bg-indigo-600 hover:bg-indigo-500
+                bg-[#1a73e8] hover:bg-[#2b84f8]
                 text-white transition-colors
                 disabled:opacity-40 disabled:cursor-not-allowed
               "

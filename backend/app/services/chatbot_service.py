@@ -4,6 +4,8 @@ No google-generativeai or google-genai package required.
 httpx is already in requirements.txt.
 """
 
+import asyncio
+import datetime
 import logging
 import uuid
 import httpx
@@ -11,7 +13,7 @@ import httpx
 logger = logging.getLogger(__name__)
 
 from app.core.config import settings
-from app.services.pinecone_service import search_relevant_context
+from app.services.pinecone_service import format_events_for_context, search_relevant_context
 
 # ---------------------------------------------------------------------------
 # In-memory session store: { session_id: [ {role, parts:[{text}]}, ... ] }
@@ -26,49 +28,52 @@ CANDIDATE_MODELS = [
 ]
 
 SYSTEM_PROMPT = """\
-You are a friendly and knowledgeable ticket reservation assistant for an event platform.
+You are a friendly and knowledgeable ticket reservation assistant for SeatStream.
 
 Your capabilities:
-- Help users discover events, check seat availability, and understand pricing
-- Guide users through the booking / reservation flow
-- Explain cancellation and hold-expiry policies (holds last 5 minutes)
-- Answer questions about venues, event dates, and ticket tiers (standard, premium, VIP)
+- Help users discover approved events, check ticket/seat availability, and understand pricing
+- Guide users through creating a Public or Event Organizer account, selecting seats (for seated events) or ticket quantity (for open events, max 5 per booking), and completing payment
+- Explain cancellation policies (bookings can be cancelled before the event starts to restore tickets and refund payment)
 
 Rules:
 - Be concise and helpful; answer in 2-4 sentences unless more detail is needed
-- When context about specific events is provided, use it; otherwise say you don't have live data
-- Never invent seat numbers or prices — only state facts present in the context
-- If a user wants to book, guide them to the seat map on the platform
+- When context about specific events is provided, use it; otherwise say you don't have live event details
+- Never invent event names, seat numbers, or prices — only state facts present in the context
 """
 
 
 async def _augment(user_message: str) -> str:
-    # 1. Try vector retrieval (Pinecone)
+    # 1. Try vector retrieval (Pinecone) in worker thread so event loop isn't blocked
     context = ""
     try:
-        context = search_relevant_context(user_message)
+        context = await asyncio.to_thread(search_relevant_context, user_message, 3)
     except Exception as exc:
         logger.debug("Pinecone search skipped/failed: %s", exc)
 
-    # 2. If no context from vector search, query active event records from the database
+    # 2. Fall back to upcoming approved event records in MySQL
     if not context:
         try:
-            from app.core.database import AsyncSessionLocal
-            from app.models import Event
             from sqlalchemy import select
-            async with AsyncSessionLocal() as session:
-                res = await session.execute(select(Event).limit(5))
-                events = res.scalars().all()
-                if events:
-                    lines = []
-                    for e in events:
-                        date_str = e.event_date.strftime("%B %d, %Y") if e.event_date else "Upcoming"
-                        lines.append(
-                            f"Event: {e.title} at venue '{e.venue_name}'. Date: {date_str}. "
-                            f"Base Price: ${e.base_price:.2f}. Description: {e.description}. "
-                            f"Seating: Rows A-B are VIP (+80%), Rows C-D are Premium (+30%), Rows E-F are Standard."
+            from app.core.database import SessionLocal
+            from app.models import ApprovalStatus, Event
+
+            today = datetime.date.today()
+            with SessionLocal() as session:
+                events = (
+                    session.execute(
+                        select(Event)
+                        .where(
+                            Event.approval_status == ApprovalStatus.APPROVED,
+                            Event.event_date >= today,
                         )
-                    context = "\n".join(lines)
+                        .order_by(Event.event_date.asc(), Event.event_time.asc())
+                        .limit(5)
+                    )
+                    .scalars()
+                    .all()
+                )
+                if events:
+                    context = format_events_for_context(events)
         except Exception as exc:
             logger.debug("Fallback event query skipped: %s", exc)
 

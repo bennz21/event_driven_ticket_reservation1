@@ -6,6 +6,7 @@ import LoginPage from './components/LoginPage';
 import AdminDashboard from './components/AdminDashboard';
 import OrganizerDashboard from './components/OrganizerDashboard';
 import PublicDashboard from './components/PublicDashboard';
+import ChatWidget from './components/ChatWidget';
 import { fetchCurrentSession, logoutSession } from './api/client';
 
 function roleHomePath(role) {
@@ -131,6 +132,7 @@ export default function App() {
         onLogout={handleLogout}
       />
       <main className="flex-1">{renderPage()}</main>
+      <ChatWidget />
     </div>
   );
 }

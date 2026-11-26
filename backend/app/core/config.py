@@ -44,6 +44,14 @@ class Settings(BaseSettings):
     BACKEND_PUBLIC_URL: str = "http://localhost:8000"
     GOOGLE_CLIENT_ID: str = ""
     GOOGLE_CLIENT_SECRET: str = ""
+    GEMINI_API_KEY: str = ""
+    PINECONE_API_KEY: str = ""
+    PINECONE_INDEX_NAME: str = "ticket-chatbot"
+    PINECONE_INDEX_HOST: str = ""
+    PINECONE_NAMESPACE: str = "events"
+    PINECONE_EMBEDDING_DIM: int = 1024
+    PINECONE_CACHE_TTL_SECONDS: int = 480
+    PINECONE_PAST_CLEANUP_INTERVAL_SECONDS: int = 21600
     CORS_ORIGINS: List[str] = [
         "http://localhost:5173",
         "http://127.0.0.1:5173",
