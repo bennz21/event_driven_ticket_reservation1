@@ -1,109 +1,279 @@
 import datetime
-from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, Enum as SQLEnum, Index, Boolean
+import enum
+from sqlalchemy import (
+    Column,
+    Date,
+    DateTime,
+    Enum as SQLEnum,
+    ForeignKey,
+    Index,
+    Integer,
+    Numeric,
+    String,
+    Text,
+    Time,
+)
 from sqlalchemy.orm import relationship
 from app.core.database import Base
-import enum
+
+
+class UserRole(str, enum.Enum):
+    ORGANIZER = "organizer"
+    PUBLIC = "public"
+
+
+class UserStatus(str, enum.Enum):
+    ACTIVE = "active"
+    BLOCKED = "blocked"
+
+
+class ApprovalStatus(str, enum.Enum):
+    PENDING = "pending"
+    APPROVED = "approved"
+    REJECTED = "rejected"
+
+
+class SeatingType(str, enum.Enum):
+    SEATED = "seated"
+    OPEN = "open"
+
 
 class SeatStatus(str, enum.Enum):
     AVAILABLE = "available"
-    HELD = "held"           # Temporarily locked while user is in checkout
-    RESERVED = "reserved"   # Fully purchased & ticketed
+    PENDING = "pending"
+    BOOKED = "booked"
 
-class ReservationStatus(str, enum.Enum):
+
+class BookingStatus(str, enum.Enum):
     PENDING = "pending"
     CONFIRMED = "confirmed"
-    EXPIRED = "expired"
     CANCELLED = "cancelled"
+    FAILED = "failed"
+
+
+class PaymentStatus(str, enum.Enum):
+    PENDING = "pending"
+    SUCCESS = "success"
+    FAILED = "failed"
+    REFUNDED = "refunded"
+
+
+def _enum_values(enum_cls):
+    return [e.value for e in enum_cls]
+
 
 class User(Base):
     __tablename__ = "users"
+    __table_args__ = {
+        "mysql_engine": "InnoDB",
+        "mysql_charset": "utf8mb4",
+    }
 
     id = Column(Integer, primary_key=True, index=True)
-    email = Column(String(255), unique=True, nullable=True, index=True)
-    full_name = Column(String(150), nullable=False)
-    password_hash = Column(String(255), nullable=True)
-    auth_provider = Column(String(30), default="local", nullable=False, index=True)
-    provider_user_id = Column(String(255), nullable=True, index=True)
-    avatar_url = Column(String(500), nullable=True)
-    is_active = Column(Boolean, default=True, nullable=False)
-    created_at = Column(DateTime, default=datetime.datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
-
-    reservations = relationship("Reservation", back_populates="user")
-
-    __table_args__ = (
-        Index("ix_user_provider_sub", "auth_provider", "provider_user_id", unique=True),
+    name = Column(String(150), nullable=False)
+    email = Column(String(255), unique=True, nullable=False, index=True)
+    password_hash = Column(String(255), nullable=False)
+    role = Column(
+        SQLEnum(UserRole, values_callable=_enum_values, name="user_role_enum"),
+        nullable=False,
+        index=True,
     )
+    status = Column(
+        SQLEnum(UserStatus, values_callable=_enum_values, name="user_status_enum"),
+        nullable=False,
+        default=UserStatus.ACTIVE,
+        index=True,
+    )
+    created_at = Column(DateTime, nullable=False, default=datetime.datetime.utcnow)
+
+    events = relationship("Event", back_populates="organizer", cascade="all, delete-orphan")
+    bookings = relationship("Booking", back_populates="user", cascade="all, delete-orphan")
 
 
 class Event(Base):
     __tablename__ = "events"
+    __table_args__ = (
+        Index("ix_events_approval_date", "approval_status", "event_date"),
+        {
+            "mysql_engine": "InnoDB",
+            "mysql_charset": "utf8mb4",
+        },
+    )
 
     id = Column(Integer, primary_key=True, index=True)
-    title = Column(String(200), nullable=False)
-    description = Column(String(1000), default="")
-    venue_name = Column(String(200), nullable=False)
-    event_date = Column(DateTime, nullable=False)
-    total_rows = Column(Integer, default=6)
-    seats_per_row = Column(Integer, default=10)
-    base_price = Column(Float, default=50.0)
-    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    organizer_id = Column(
+        Integer,
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    title = Column(String(200), nullable=False, index=True)
+    description = Column(Text, nullable=False)
+    event_date = Column(Date, nullable=False, index=True)
+    event_time = Column(Time, nullable=False)
+    venue = Column(String(200), nullable=False, index=True)
+    ticket_price = Column(Numeric(10, 2), nullable=False)
+    seating_type = Column(
+        SQLEnum(SeatingType, values_callable=_enum_values, name="seating_type_enum"),
+        nullable=False,
+        default=SeatingType.OPEN,
+        index=True,
+    )
+    total_rows = Column(Integer, nullable=True)
+    seats_per_row = Column(Integer, nullable=True)
+    total_tickets = Column(Integer, nullable=False)
+    available_tickets = Column(Integer, nullable=False)
+    approval_status = Column(
+        SQLEnum(ApprovalStatus, values_callable=_enum_values, name="approval_status_enum"),
+        nullable=False,
+        default=ApprovalStatus.PENDING,
+        index=True,
+    )
+    created_at = Column(DateTime, nullable=False, default=datetime.datetime.utcnow)
+    updated_at = Column(
+        DateTime,
+        nullable=False,
+        default=datetime.datetime.utcnow,
+        onupdate=datetime.datetime.utcnow,
+    )
 
-    # Relationships
+    organizer = relationship("User", back_populates="events")
     seats = relationship("Seat", back_populates="event", cascade="all, delete-orphan")
-    reservations = relationship("Reservation", back_populates="event")
+    bookings = relationship("Booking", back_populates="event", cascade="all, delete-orphan")
+    tickets = relationship("Ticket", back_populates="event", cascade="all, delete-orphan")
+
 
 class Seat(Base):
     __tablename__ = "seats"
-
-    id = Column(Integer, primary_key=True, index=True)
-    event_id = Column(Integer, ForeignKey("events.id", ondelete="CASCADE"), nullable=False, index=True)
-    row = Column(String(10), nullable=False)           # e.g., 'A', 'B', 'VIP'
-    seat_number = Column(Integer, nullable=False)      # e.g., 1, 2, 3
-    tier = Column(String(50), default="standard")      # standard, premium, vip
-    price = Column(Float, nullable=False)
-    
-    # State tracking
-    status = Column(SQLEnum(SeatStatus), default=SeatStatus.AVAILABLE, nullable=False, index=True)
-    held_by_session_id = Column(String(100), nullable=True, index=True)
-    held_until = Column(DateTime, nullable=True, index=True)
-    version = Column(Integer, default=1, nullable=False) # For optimistic locking
-
-    # Relationships
-    event = relationship("Event", back_populates="seats")
-    tickets = relationship("Ticket", back_populates="seat")
-
     __table_args__ = (
-        Index("ix_seat_event_row_num", "event_id", "row", "seat_number", unique=True),
+        Index("uq_seat_event_row_num", "event_id", "row_label", "seat_number", unique=True),
+        {
+            "mysql_engine": "InnoDB",
+            "mysql_charset": "utf8mb4",
+        },
     )
 
-class Reservation(Base):
-    __tablename__ = "reservations"
+    id = Column(Integer, primary_key=True, index=True)
+    event_id = Column(
+        Integer,
+        ForeignKey("events.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    row_label = Column(String(10), nullable=False)
+    seat_number = Column(Integer, nullable=False)
+    status = Column(
+        SQLEnum(SeatStatus, values_callable=_enum_values, name="seat_status_enum"),
+        nullable=False,
+        default=SeatStatus.AVAILABLE,
+        index=True,
+    )
+    booking_id = Column(
+        Integer,
+        ForeignKey("bookings.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+
+    event = relationship("Event", back_populates="seats")
+    booking = relationship("Booking", back_populates="seats")
+
+
+class Booking(Base):
+    __tablename__ = "bookings"
+    __table_args__ = (
+        Index("ix_bookings_user_status", "user_id", "status"),
+        {
+            "mysql_engine": "InnoDB",
+            "mysql_charset": "utf8mb4",
+        },
+    )
 
     id = Column(Integer, primary_key=True, index=True)
-    event_id = Column(Integer, ForeignKey("events.id"), nullable=False)
-    user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
-    session_id = Column(String(100), nullable=False, index=True)
-    customer_name = Column(String(150), nullable=False)
-    customer_email = Column(String(150), nullable=True, default="")
-    total_amount = Column(Float, nullable=False)
-    status = Column(SQLEnum(ReservationStatus), default=ReservationStatus.CONFIRMED, nullable=False)
-    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    user_id = Column(
+        Integer,
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    event_id = Column(
+        Integer,
+        ForeignKey("events.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    ticket_count = Column(Integer, nullable=False)
+    total_amount = Column(Numeric(10, 2), nullable=False)
+    status = Column(
+        SQLEnum(BookingStatus, values_callable=_enum_values, name="booking_status_enum"),
+        nullable=False,
+        default=BookingStatus.PENDING,
+        index=True,
+    )
+    booked_at = Column(DateTime, nullable=False, default=datetime.datetime.utcnow, index=True)
 
-    # Relationships
-    event = relationship("Event", back_populates="reservations")
-    user = relationship("User", back_populates="reservations")
-    tickets = relationship("Ticket", back_populates="reservation", cascade="all, delete-orphan")
+    user = relationship("User", back_populates="bookings")
+    event = relationship("Event", back_populates="bookings")
+    seats = relationship("Seat", back_populates="booking")
+    payment = relationship("Payment", back_populates="booking", uselist=False, cascade="all, delete-orphan")
+    tickets = relationship("Ticket", back_populates="booking", cascade="all, delete-orphan")
+
+
+class Payment(Base):
+    __tablename__ = "payments"
+    __table_args__ = {
+        "mysql_engine": "InnoDB",
+        "mysql_charset": "utf8mb4",
+    }
+
+    id = Column(Integer, primary_key=True, index=True)
+    booking_id = Column(
+        Integer,
+        ForeignKey("bookings.id", ondelete="CASCADE"),
+        nullable=False,
+        unique=True,
+        index=True,
+    )
+    amount = Column(Numeric(10, 2), nullable=False)
+    status = Column(
+        SQLEnum(PaymentStatus, values_callable=_enum_values, name="payment_status_enum"),
+        nullable=False,
+        default=PaymentStatus.PENDING,
+        index=True,
+    )
+    gateway_transaction_id = Column(String(120), nullable=True, index=True)
+    paid_at = Column(DateTime, nullable=True)
+
+    booking = relationship("Booking", back_populates="payment")
+
 
 class Ticket(Base):
     __tablename__ = "tickets"
+    __table_args__ = {
+        "mysql_engine": "InnoDB",
+        "mysql_charset": "utf8mb4",
+    }
 
     id = Column(Integer, primary_key=True, index=True)
-    reservation_id = Column(Integer, ForeignKey("reservations.id", ondelete="CASCADE"), nullable=False)
-    seat_id = Column(Integer, ForeignKey("seats.id"), nullable=False)
+    booking_id = Column(
+        Integer,
+        ForeignKey("bookings.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    event_id = Column(
+        Integer,
+        ForeignKey("events.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    seat_id = Column(
+        Integer,
+        ForeignKey("seats.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    seat_label = Column(String(20), nullable=True)
     ticket_code = Column(String(64), unique=True, nullable=False, index=True)
-    issued_at = Column(DateTime, default=datetime.datetime.utcnow)
 
-    # Relationships
-    reservation = relationship("Reservation", back_populates="tickets")
-    seat = relationship("Seat", back_populates="tickets")
+    booking = relationship("Booking", back_populates="tickets")
+    event = relationship("Event", back_populates="tickets")

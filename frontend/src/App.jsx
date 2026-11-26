@@ -1,455 +1,136 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import Navbar from './components/Navbar';
-import SeatMap from './components/SeatMap';
-import HoldTimer from './components/HoldTimer';
-import CheckoutModal from './components/CheckoutModal';
-import ActivityFeed from './components/ActivityFeed';
-import AuthModal from './components/AuthModal';
-import MyTicketsModal from './components/MyTicketsModal';
 import HomeScreen from './components/HomeScreen';
-import EventInfoModal from './components/EventInfoModal';
-import SupportModal from './components/SupportModal';
-import {
-  getSessionId,
-  fetchEvents,
-  fetchSeats,
-  holdSeats,
-  releaseSeats,
-  confirmReservation,
-  fetchCurrentUser,
-  setStoredToken,
-  logoutAccount,
-  exchangeOAuthCode,
-} from './api/client';
-import { useEventWebSocket } from './hooks/useEventWebSocket';
-import { Calendar, MapPin, DollarSign, Sparkles, RotateCcw, User as UserIcon } from 'lucide-react';
-import ChatWidget from './components/ChatWidget';
+import SignupPage from './components/SignupPage';
+import LoginPage from './components/LoginPage';
+import AdminDashboard from './components/AdminDashboard';
+import OrganizerDashboard from './components/OrganizerDashboard';
+import PublicDashboard from './components/PublicDashboard';
+import { fetchCurrentSession, logoutSession } from './api/client';
+
+function roleHomePath(role) {
+  if (role === 'admin') return '/admin';
+  if (role === 'organizer') return '/organizer';
+  return '/public';
+}
 
 export default function App() {
-  const [sessionId, setSessionId] = useState(getSessionId());
-  const [events, setEvents] = useState([]);
-  const [selectedEventId, setSelectedEventId] = useState(null);
-  const [seats, setSeats] = useState([]);
-  const [isHolding, setIsHolding] = useState(false);
-  const [holdExpiration, setHoldExpiration] = useState(null);
-  const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [completedReservation, setCompletedReservation] = useState(null);
   const [user, setUser] = useState(null);
-  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
-  const [authModalMode, setAuthModalMode] = useState('login');
-  const [oauthBannerError, setOauthBannerError] = useState('');
-  const [isMyTicketsOpen, setIsMyTicketsOpen] = useState(false);
-  const [isEventInfoOpen, setIsEventInfoOpen] = useState(false);
-  const [isSupportOpen, setIsSupportOpen] = useState(false);
-  const [activeView, setActiveView] = useState('home');
+  const [authChecked, setAuthChecked] = useState(false);
+  const [currentPath, setCurrentPath] = useState(() => window.location.pathname || '/');
+  const [oauthError, setOauthError] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('oauth_error') || '';
+  });
 
-  // Real-time WebSocket hook
-  const { isConnected, lastMessage, eventFeed } = useEventWebSocket(selectedEventId);
+  const navigate = useCallback((path) => {
+    if (window.location.pathname !== path) {
+      window.history.pushState({}, '', path);
+    }
+    setOauthError('');
+    setCurrentPath(path);
+  }, []);
 
-  // Restore authenticated user or complete OAuth redirect callback
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const oauthCode = params.get('oauth_code');
-    const oauthError = params.get('oauth_error');
-
-    if (oauthCode || oauthError) {
+    if (params.has('oauth_error')) {
       window.history.replaceState({}, document.title, window.location.pathname);
     }
-
-    if (oauthCode) {
-      exchangeOAuthCode(oauthCode)
-        .then((res) => {
-          setStoredToken(res.access_token);
-          setUser(res.user);
-          setActiveView('workspace');
-        })
-        .catch((err) => {
-          setOauthBannerError(err.message || 'Social sign-in failed');
-          setAuthModalMode('login');
-          setIsAuthModalOpen(true);
-        });
-      return;
-    }
-
-    if (oauthError) {
-      setOauthBannerError(oauthError);
-      setAuthModalMode('login');
-      setIsAuthModalOpen(true);
-    }
-
-    fetchCurrentUser().then((u) => {
-      if (u) {
-        setUser(u);
-      }
-    });
+    const onPopState = () => setCurrentPath(window.location.pathname || '/');
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
   }, []);
 
-  // Load initial events
   useEffect(() => {
-    async function loadEvents() {
-      try {
-        const data = await fetchEvents();
-        setEvents(data);
-        if (data.length > 0) {
-          setSelectedEventId(data[0].id);
+    fetchCurrentSession()
+      .then((actor) => {
+        if (actor) {
+          setUser(actor);
         }
-      } catch (err) {
-        console.error('Failed to load events:', err);
-      }
-    }
-    loadEvents();
+      })
+      .finally(() => setAuthChecked(true));
   }, []);
 
-  // Fetch seats whenever selectedEventId changes
-  const loadSeats = useCallback(async () => {
-    if (!selectedEventId) return;
-    try {
-      const data = await fetchSeats(selectedEventId);
-      setSeats(data);
-      // Determine if there are already held seats for this session
-      const myHeldSeats = data.filter(
-        (s) => s.status === 'held' && s.held_by_session_id === sessionId
-      );
-      if (myHeldSeats.length > 0 && myHeldSeats[0].held_until) {
-        setHoldExpiration(myHeldSeats[0].held_until);
-      } else {
-        setHoldExpiration(null);
-      }
-    } catch (err) {
-      console.error('Failed to load seats:', err);
-    }
-  }, [selectedEventId, sessionId]);
-
-  useEffect(() => {
-    loadSeats();
-  }, [loadSeats]);
-
-  // Handle incoming WebSocket messages to update seats incrementally
-  useEffect(() => {
-    if (!lastMessage || lastMessage.event_id !== selectedEventId) return;
-
-    if (lastMessage.type === 'seat.held') {
-      const { seat_ids, session_id: lockSessionId, held_until } = lastMessage.payload;
-      setSeats((prev) =>
-        prev.map((s) => {
-          if (seat_ids.includes(s.id)) {
-            return {
-              ...s,
-              status: 'held',
-              held_by_session_id: lockSessionId,
-              held_until,
-            };
-          }
-          return s;
-        })
-      );
-      if (lockSessionId === sessionId) {
-        setHoldExpiration(held_until);
-      }
-    } else if (lastMessage.type === 'seat.released') {
-      const { seat_ids } = lastMessage.payload;
-      setSeats((prev) =>
-        prev.map((s) => {
-          if (seat_ids.includes(s.id)) {
-            return {
-              ...s,
-              status: 'available',
-              held_by_session_id: null,
-              held_until: null,
-            };
-          }
-          return s;
-        })
-      );
-    } else if (lastMessage.type === 'reservation.confirmed') {
-      const { seat_ids } = lastMessage.payload;
-      setSeats((prev) =>
-        prev.map((s) => {
-          if (seat_ids.includes(s.id)) {
-            return {
-              ...s,
-              status: 'reserved',
-              held_by_session_id: null,
-              held_until: null,
-            };
-          }
-          return s;
-        })
-      );
-    }
-  }, [lastMessage, selectedEventId, sessionId]);
-
-  // Switch/Reset user session
-  const handleResetSession = () => {
-    const newSession = `user_${Math.random().toString(36).substring(2, 9)}`;
-    sessionStorage.setItem('ticket_app_session_id', newSession);
-    setSessionId(newSession);
-    setHoldExpiration(null);
-    setCompletedReservation(null);
-  };
-
-  // Toggle seat hold / release
-  const handleToggleSeat = async (seat) => {
-    if (isHolding) return;
-    setIsHolding(true);
-    try {
-      const isAlreadyHeldByMe = seat.status === 'held' && seat.held_by_session_id === sessionId;
-
-      if (isAlreadyHeldByMe) {
-        // Release seat
-        await releaseSeats(selectedEventId, [seat.id], sessionId);
-        setSeats((prev) =>
-          prev.map((s) =>
-            s.id === seat.id
-              ? { ...s, status: 'available', held_by_session_id: null, held_until: null }
-              : s
-          )
-        );
-      } else {
-        // Hold seat
-        const result = await holdSeats(selectedEventId, [seat.id], sessionId);
-        if (result.success) {
-          setHoldExpiration(result.held_until);
-          setSeats((prev) =>
-            prev.map((s) =>
-              s.id === seat.id
-                ? {
-                    ...s,
-                    status: 'held',
-                    held_by_session_id: sessionId,
-                    held_until: result.held_until,
-                  }
-                : s
-            )
-          );
-        } else {
-          alert(result.message);
-          loadSeats(); // Refresh if conflicted
-        }
-      }
-    } catch (err) {
-      alert(err.message || 'Error updating seat hold');
-      loadSeats();
-    } finally {
-      setIsHolding(false);
-    }
-  };
-
-  // Seats currently held by this session
-  const myHeldSeats = seats.filter(
-    (s) => s.status === 'held' && s.held_by_session_id === sessionId
-  );
-
-  const currentEvent = events.find((e) => e.id === selectedEventId) || events[0];
-
-  const handleConfirmReservation = async ({ name, email }) => {
-    setIsSubmitting(true);
-    try {
-      const result = await confirmReservation(selectedEventId, {
-        seat_ids: myHeldSeats.map((s) => s.id),
-        session_id: sessionId,
-        customer_name: name,
-        customer_email: email,
-      });
-      setCompletedReservation(result);
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const handleAuthSuccess = (authResponse) => {
-    setStoredToken(authResponse.access_token);
-    setUser(authResponse.user);
-    setOauthBannerError('');
-    setActiveView('workspace');
+  const handleAuthSuccess = (authenticatedUser) => {
+    setUser(authenticatedUser);
+    navigate(roleHomePath(authenticatedUser.role));
   };
 
   const handleLogout = async () => {
-    await logoutAccount();
+    await logoutSession();
     setUser(null);
-    setActiveView('home');
+    navigate('/');
   };
 
-  const openAuthModal = (mode) => {
-    setOauthBannerError('');
-    setAuthModalMode(mode);
-    setIsAuthModalOpen(true);
-  };
+  const renderPage = () => {
+    if (!authChecked) {
+      return (
+        <div className="flex-1 flex items-center justify-center py-20 text-sm text-slate-400">
+          Loading session...
+        </div>
+      );
+    }
 
-  const availableSeatsCount = seats.filter((s) => s.status === 'available').length;
+    if (currentPath === '/') {
+      return <HomeScreen user={user} onNavigate={navigate} />;
+    }
+
+    if (currentPath === '/signup') {
+      if (user) return <HomeScreen user={user} onNavigate={navigate} />;
+      return <SignupPage onAuthSuccess={handleAuthSuccess} onNavigate={navigate} />;
+    }
+
+    if (currentPath === '/login/admin') {
+      if (user) {
+        return user.role === 'admin' ? <AdminDashboard /> : <HomeScreen user={user} onNavigate={navigate} />;
+      }
+      return <LoginPage role="admin" externalError={oauthError} onAuthSuccess={handleAuthSuccess} onNavigate={navigate} />;
+    }
+
+    if (currentPath === '/login/organizer') {
+      if (user) {
+        return user.role === 'organizer' ? <OrganizerDashboard /> : <HomeScreen user={user} onNavigate={navigate} />;
+      }
+      return <LoginPage role="organizer" externalError={oauthError} onAuthSuccess={handleAuthSuccess} onNavigate={navigate} />;
+    }
+
+    if (currentPath === '/login/public') {
+      if (user) {
+        return user.role === 'public' ? <PublicDashboard user={user} /> : <HomeScreen user={user} onNavigate={navigate} />;
+      }
+      return <LoginPage role="public" externalError={oauthError} onAuthSuccess={handleAuthSuccess} onNavigate={navigate} />;
+    }
+
+    if (currentPath === '/admin') {
+      if (!user) return <LoginPage role="admin" onAuthSuccess={handleAuthSuccess} onNavigate={navigate} />;
+      if (user.role !== 'admin') return <HomeScreen user={user} onNavigate={navigate} />;
+      return <AdminDashboard />;
+    }
+
+    if (currentPath === '/organizer') {
+      if (!user) return <LoginPage role="organizer" onAuthSuccess={handleAuthSuccess} onNavigate={navigate} />;
+      if (user.role !== 'organizer') return <HomeScreen user={user} onNavigate={navigate} />;
+      return <OrganizerDashboard />;
+    }
+
+    if (currentPath === '/public') {
+      if (!user) return <LoginPage role="public" onAuthSuccess={handleAuthSuccess} onNavigate={navigate} />;
+      if (user.role !== 'public') return <HomeScreen user={user} onNavigate={navigate} />;
+      return <PublicDashboard user={user} />;
+    }
+
+    return <HomeScreen user={user} onNavigate={navigate} />;
+  };
 
   return (
     <div className="min-h-screen bg-[#050a18] text-slate-100 flex flex-col">
       <Navbar
-        isConnected={isConnected}
         user={user}
-        onOpenAuth={openAuthModal}
-        onOpenMyTickets={() => setIsMyTicketsOpen(true)}
-        onOpenEventInfo={() => setIsEventInfoOpen(true)}
-        onOpenSupport={() => setIsSupportOpen(true)}
+        currentPath={currentPath}
+        onNavigate={navigate}
         onLogout={handleLogout}
-        activeView={activeView}
-        onNavigate={setActiveView}
       />
-
-      {!user || activeView === 'home' ? (
-        <main className="flex-1">
-          <HomeScreen
-            featuredEvent={currentEvent}
-            user={user}
-            onOpenAuth={openAuthModal}
-            onEnterWorkspace={() => setActiveView('workspace')}
-            onOpenEventInfo={() => setIsEventInfoOpen(true)}
-            onOpenMyTickets={() => setIsMyTicketsOpen(true)}
-          />
-        </main>
-      ) : (
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
-        {/* Event Header Banner */}
-        {currentEvent && (
-          <div className="relative overflow-hidden bg-gradient-to-r from-[#0c1a3a] via-[#091329] to-[#081021] border border-[#192b52] rounded-2xl p-6 sm:p-8 backdrop-blur-md">
-            <div className="relative z-10 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
-              <div className="space-y-2">
-                <div className="flex flex-wrap items-center gap-2">
-                  <div className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full bg-[#1a73e8]/15 border border-[#2684ff]/30 text-[#60a5fa] text-xs font-semibold">
-                    <Sparkles className="w-3.5 h-3.5" />
-                    <span>Featured Live Event</span>
-                  </div>
-                  <div className="inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-full bg-[#060d1c] border border-[#1a2c4f] text-[11px] font-mono text-slate-300">
-                    <UserIcon className="w-3 h-3 text-[#2684ff]" />
-                    <span>{sessionId}</span>
-                    <button
-                      type="button"
-                      onClick={handleResetSession}
-                      title="Switch seat session"
-                      className="text-slate-400 hover:text-white transition-colors"
-                    >
-                      <RotateCcw className="w-3 h-3" />
-                    </button>
-                  </div>
-                </div>
-                <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
-                  {currentEvent.title}
-                </h1>
-                <p className="text-sm text-slate-300 max-w-2xl leading-relaxed">
-                  {currentEvent.description}
-                </p>
-
-                <div className="flex flex-wrap items-center gap-4 pt-2 text-xs text-slate-400 font-medium">
-                  <div className="flex items-center space-x-1.5">
-                    <MapPin className="w-4 h-4 text-[#2684ff]" />
-                    <span>{currentEvent.venue_name}</span>
-                  </div>
-                  <div className="flex items-center space-x-1.5">
-                    <Calendar className="w-4 h-4 text-[#2684ff]" />
-                    <span>{new Date(currentEvent.event_date).toLocaleDateString()}</span>
-                  </div>
-                  <div className="flex items-center space-x-1.5">
-                    <DollarSign className="w-4 h-4 text-emerald-400" />
-                    <span>From ${currentEvent.base_price.toFixed(2)}</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Hold Timer / Checkout Action Panel */}
-              <div className="flex flex-col sm:flex-row items-center gap-4 self-start lg:self-center">
-                {myHeldSeats.length > 0 && (
-                  <HoldTimer
-                    heldUntil={holdExpiration}
-                    onExpired={() => {
-                      loadSeats();
-                      setHoldExpiration(null);
-                    }}
-                  />
-                )}
-
-                <button
-                  disabled={myHeldSeats.length === 0}
-                  onClick={() => setIsCheckoutOpen(true)}
-                  className="w-full sm:w-auto px-6 py-3 rounded-full bg-[#1a73e8] hover:bg-[#2b84f8] disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold text-sm transition-all shadow-[0_0_20px_rgba(26,115,232,0.35)] flex items-center justify-center space-x-2"
-                >
-                  <span>Checkout {myHeldSeats.length > 0 ? `(${myHeldSeats.length} Seats)` : ''}</span>
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Main Content Grid: Seat Map + Live Event Stream */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          <div className="lg:col-span-2 space-y-6">
-            <SeatMap
-              seats={seats}
-              sessionId={sessionId}
-              onToggleSeat={handleToggleSeat}
-              isHolding={isHolding}
-            />
-          </div>
-
-          <div className="lg:col-span-1">
-            <ActivityFeed feed={eventFeed} />
-          </div>
-        </div>
-      </main>
-      )}
-
-      {/* Checkout Modal */}
-      <CheckoutModal
-        isOpen={isCheckoutOpen}
-        onClose={() => {
-          setIsCheckoutOpen(false);
-          if (completedReservation) {
-            setCompletedReservation(null);
-            loadSeats();
-          }
-        }}
-        selectedSeats={myHeldSeats}
-        onConfirm={handleConfirmReservation}
-        isSubmitting={isSubmitting}
-        completedReservation={completedReservation}
-        user={user}
-      />
-
-      {/* Auth Modal (Email, Google, Apple) */}
-      <AuthModal
-        isOpen={isAuthModalOpen}
-        initialMode={authModalMode}
-        onClose={() => {
-          setIsAuthModalOpen(false);
-          setOauthBannerError('');
-        }}
-        onAuthSuccess={handleAuthSuccess}
-        externalError={oauthBannerError}
-      />
-
-      {/* User's Confirmed Tickets */}
-      <MyTicketsModal
-        isOpen={isMyTicketsOpen}
-        onClose={() => setIsMyTicketsOpen(false)}
-        user={user}
-      />
-
-      {/* Event Info Modal */}
-      <EventInfoModal
-        isOpen={isEventInfoOpen}
-        onClose={() => setIsEventInfoOpen(false)}
-        event={currentEvent}
-        availableSeatsCount={availableSeatsCount}
-        totalSeatsCount={seats.length}
-        user={user}
-        onEnterWorkspace={() => setActiveView('workspace')}
-        onOpenAuth={openAuthModal}
-      />
-
-      {/* Support Modal */}
-      <SupportModal
-        isOpen={isSupportOpen}
-        onClose={() => setIsSupportOpen(false)}
-      />
-
-      {/* AI Chatbot — floating bottom-right */}
-      <ChatWidget />
+      <main className="flex-1">{renderPage()}</main>
     </div>
   );
 }

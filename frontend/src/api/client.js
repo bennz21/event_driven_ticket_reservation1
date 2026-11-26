@@ -1,184 +1,166 @@
 const API_BASE = '/api/v1';
-const TOKEN_STORAGE_KEY = 'ticket_app_access_token';
 
-// Session ID unique to this browser tab (stored in sessionStorage)
-export function getSessionId() {
-  let sessionId = sessionStorage.getItem('ticket_app_session_id');
-  if (!sessionId) {
-    sessionId = `user_${Math.random().toString(36).substring(2, 9)}`;
-    sessionStorage.setItem('ticket_app_session_id', sessionId);
-  }
-  return sessionId;
-}
-
-export function getStoredToken() {
-  return localStorage.getItem(TOKEN_STORAGE_KEY);
-}
-
-export function setStoredToken(token) {
-  localStorage.setItem(TOKEN_STORAGE_KEY, token);
-}
-
-export function clearStoredToken() {
-  localStorage.removeItem(TOKEN_STORAGE_KEY);
-}
-
-function authHeaders() {
-  const token = getStoredToken();
-  return token ? { Authorization: `Bearer ${token}` } : {};
-}
-
-async function parseErrorDetail(res, fallback) {
-  const error = await res.json().catch(() => ({ detail: fallback }));
-  if (Array.isArray(error.detail)) {
-    return error.detail.map((d) => d.msg || String(d)).join(', ');
-  }
-  return error.detail || fallback;
-}
-
-// --- Auth API ---
-
-export async function registerAccount({ full_name, email, password }) {
-  const res = await fetch(`${API_BASE}/auth/register`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ full_name, email, password }),
+async function apiFetch(path, options = {}) {
+  const { headers = {}, ...rest } = options;
+  const res = await fetch(`${API_BASE}${path}`, {
+    credentials: 'include',
+    headers: {
+      ...(options.body ? { 'Content-Type': 'application/json' } : {}),
+      ...headers,
+    },
+    ...rest,
   });
-  if (!res.ok) {
-    throw new Error(await parseErrorDetail(res, 'Failed to create account'));
-  }
-  return res.json();
-}
 
-export async function loginAccount({ email, password }) {
-  const res = await fetch(`${API_BASE}/auth/login`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, password }),
-  });
-  if (!res.ok) {
-    throw new Error(await parseErrorDetail(res, 'Sign in failed'));
-  }
-  return res.json();
-}
-
-export async function fetchCurrentUser() {
-  const token = getStoredToken();
-  if (!token) return null;
-  const res = await fetch(`${API_BASE}/auth/me`, {
-    headers: { ...authHeaders() },
-  });
-  if (!res.ok) {
-    clearStoredToken();
+  if (res.status === 204) {
     return null;
   }
-  return res.json();
-}
 
-export async function logoutAccount() {
-  const token = getStoredToken();
-  if (token) {
-    await fetch(`${API_BASE}/auth/logout`, {
-      method: 'POST',
-      headers: { ...authHeaders() },
-    }).catch(() => {});
-  }
-  clearStoredToken();
-}
-
-export async function fetchMyReservations() {
-  const res = await fetch(`${API_BASE}/auth/reservations`, {
-    headers: { ...authHeaders() },
-  });
+  const data = await res.json().catch(() => null);
   if (!res.ok) {
-    throw new Error(await parseErrorDetail(res, 'Failed to load tickets'));
+    let message = `Request failed (${res.status})`;
+    if (data?.detail) {
+      message = Array.isArray(data.detail)
+        ? data.detail.map((d) => d.msg || String(d)).join(', ')
+        : String(data.detail);
+    }
+    const err = new Error(message);
+    err.status = res.status;
+    throw err;
   }
-  return res.json();
+  return data;
 }
 
-export async function fetchAuthProviders() {
-  const res = await fetch(`${API_BASE}/auth/providers`);
-  if (!res.ok) {
-    return {
-      google: { configured: false, demo_enabled: false },
-      apple: { configured: false, demo_enabled: false },
-    };
-  }
-  return res.json();
-}
-
-export function getOAuthLoginUrl(provider) {
-  return `${API_BASE}/auth/oauth/${provider}/login`;
-}
-
-export async function exchangeOAuthCode(code) {
-  const res = await fetch(`${API_BASE}/auth/oauth/exchange`, {
+// --- Auth ---
+export function signupAccount(payload) {
+  return apiFetch('/auth/signup', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ code }),
+    body: JSON.stringify(payload),
   });
-  if (!res.ok) {
-    throw new Error(await parseErrorDetail(res, 'OAuth login failed'));
-  }
-  return res.json();
 }
 
-export async function demoOAuthLogin({ provider, email, full_name }) {
-  const res = await fetch(`${API_BASE}/auth/oauth/demo`, {
+export function loginByRole(role, payload) {
+  return apiFetch(`/auth/${role}/login`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ provider, email, full_name }),
+    body: JSON.stringify(payload),
   });
-  if (!res.ok) {
-    throw new Error(await parseErrorDetail(res, `${provider} sign-in failed`));
+}
+
+export async function fetchCurrentSession() {
+  try {
+    return await apiFetch('/auth/me');
+  } catch (err) {
+    if (err.status === 401 || err.status === 403) {
+      return null;
+    }
+    throw err;
   }
-  return res.json();
 }
 
-// --- Events, Seats & Reservations ---
-
-export async function fetchEvents() {
-  const res = await fetch(`${API_BASE}/events`);
-  if (!res.ok) throw new Error('Failed to fetch events');
-  return res.json();
+export function logoutSession() {
+  return apiFetch('/auth/logout', { method: 'POST' });
 }
 
-export async function fetchSeats(eventId) {
-  const res = await fetch(`${API_BASE}/events/${eventId}/seats`);
-  if (!res.ok) throw new Error('Failed to fetch seats');
-  return res.json();
+export function getGoogleOAuthUrl(role) {
+  return `${API_BASE}/auth/oauth/google/login?role=${encodeURIComponent(role)}`;
 }
 
-export async function holdSeats(eventId, seatIds, sessionId) {
-  const res = await fetch(`${API_BASE}/events/${eventId}/seats/hold`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...authHeaders() },
-    body: JSON.stringify({ seat_ids: seatIds, session_id: sessionId }),
+// --- Admin ---
+export function adminFetchEvents(approvalStatus = '') {
+  const qs = approvalStatus ? `?approval_status=${encodeURIComponent(approvalStatus)}` : '';
+  return apiFetch(`/admin/events${qs}`);
+}
+
+export function adminApproveEvent(eventId) {
+  return apiFetch(`/admin/events/${eventId}/approve`, { method: 'POST' });
+}
+
+export function adminRejectEvent(eventId) {
+  return apiFetch(`/admin/events/${eventId}/reject`, { method: 'POST' });
+}
+
+export function adminFetchUsers(role = '') {
+  const qs = role ? `?role=${encodeURIComponent(role)}` : '';
+  return apiFetch(`/admin/users${qs}`);
+}
+
+export function adminUpdateUserStatus(userId, status) {
+  return apiFetch(`/admin/users/${userId}/status`, {
+    method: 'PATCH',
+    body: JSON.stringify({ status }),
   });
-  if (!res.ok) {
-    throw new Error(await parseErrorDetail(res, 'Failed to hold seats'));
-  }
-  return res.json();
 }
 
-export async function releaseSeats(eventId, seatIds, sessionId) {
-  const res = await fetch(`${API_BASE}/events/${eventId}/seats/release`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...authHeaders() },
-    body: JSON.stringify({ seat_ids: seatIds, session_id: sessionId }),
-  });
-  if (!res.ok) throw new Error('Failed to release seats');
-  return res.json();
+export function adminDeleteUser(userId) {
+  return apiFetch(`/admin/users/${userId}`, { method: 'DELETE' });
 }
 
-export async function confirmReservation(eventId, data) {
-  const res = await fetch(`${API_BASE}/events/${eventId}/reservations/confirm`, {
+export function adminFetchBookings() {
+  return apiFetch('/admin/bookings');
+}
+
+export function adminFetchPayments() {
+  return apiFetch('/admin/payments');
+}
+
+// --- Organizer ---
+export function organizerFetchEvents() {
+  return apiFetch('/organizer/events');
+}
+
+export function organizerCreateEvent(payload) {
+  return apiFetch('/organizer/events', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...authHeaders() },
-    body: JSON.stringify(data),
+    body: JSON.stringify(payload),
   });
-  if (!res.ok) {
-    throw new Error(await parseErrorDetail(res, 'Reservation failed'));
-  }
-  return res.json();
+}
+
+export function organizerUpdateEvent(eventId, payload) {
+  return apiFetch(`/organizer/events/${eventId}`, {
+    method: 'PUT',
+    body: JSON.stringify(payload),
+  });
+}
+
+export function organizerDeleteEvent(eventId) {
+  return apiFetch(`/organizer/events/${eventId}`, { method: 'DELETE' });
+}
+
+export function organizerFetchBookings() {
+  return apiFetch('/organizer/bookings');
+}
+
+// --- Public ---
+export function publicBrowseEvents(query = '') {
+  const qs = query.trim() ? `?q=${encodeURIComponent(query.trim())}` : '';
+  return apiFetch(`/public/events${qs}`);
+}
+
+export function publicFetchEventSeats(eventId) {
+  return apiFetch(`/public/events/${eventId}/seats`);
+}
+
+export function publicCreateBooking(payload) {
+  return apiFetch('/public/bookings', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export function publicPayBooking(bookingId, payload) {
+  return apiFetch(`/public/bookings/${bookingId}/pay`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export function publicFetchBookings() {
+  return apiFetch('/public/bookings');
+}
+
+export function publicFetchBookingDetail(bookingId) {
+  return apiFetch(`/public/bookings/${bookingId}`);
+}
+
+export function publicCancelBooking(bookingId) {
+  return apiFetch(`/public/bookings/${bookingId}/cancel`, { method: 'POST' });
 }

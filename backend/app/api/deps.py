@@ -1,99 +1,139 @@
+from dataclasses import dataclass
 from typing import Optional
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.core.database import get_db
 from app.core.security import decode_access_token
-from app.models import User
-from app.services.auth_service import AuthService
-from app.services.reservation_service import ReservationService
-from app.services.seat_service import SeatService
+from app.models import User, UserRole, UserStatus
 
 bearer_scheme = HTTPBearer(auto_error=False)
+AUTH_COOKIE_NAME = "access_token"
 
 
-async def get_seat_service(db: AsyncSession = Depends(get_db)) -> SeatService:
-    return SeatService(db)
+@dataclass
+class CurrentActor:
+    role: str  # "admin" | "organizer" | "public"
+    email: str
+    name: str
+    user: Optional[User] = None
+
+    @property
+    def id(self) -> Optional[int]:
+        return self.user.id if self.user is not None else None
 
 
-async def get_reservation_service(db: AsyncSession = Depends(get_db)) -> ReservationService:
-    return ReservationService(db)
+def _extract_token(
+    request: Request,
+    credentials: Optional[HTTPAuthorizationCredentials],
+) -> Optional[str]:
+    cookie_token = request.cookies.get(AUTH_COOKIE_NAME)
+    if cookie_token:
+        return cookie_token
+    if credentials is not None and credentials.scheme.lower() == "bearer":
+        return credentials.credentials
+    return None
 
 
-async def get_auth_service(db: AsyncSession = Depends(get_db)) -> AuthService:
-    return AuthService(db)
-
-
-async def get_optional_current_user(
+def get_current_actor(
+    request: Request,
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(bearer_scheme),
-    db: AsyncSession = Depends(get_db),
-) -> Optional[User]:
-    """Returns the signed-in User if a valid Bearer token is provided, otherwise None."""
-    if credentials is None or credentials.scheme.lower() != "bearer":
-        return None
-    try:
-        payload = decode_access_token(credentials.credentials)
-    except ValueError:
-        return None
-
-    jti = payload.get("jti", "")
-    if await AuthService.is_token_revoked(jti):
-        return None
-
-    try:
-        user_id = int(payload["sub"])
-    except (KeyError, TypeError, ValueError):
-        return None
-
-    user = (await db.execute(select(User).where(User.id == user_id))).scalar_one_or_none()
-    if user is None or not user.is_active:
-        return None
-    return user
-
-
-async def get_current_user(
-    credentials: Optional[HTTPAuthorizationCredentials] = Depends(bearer_scheme),
-    db: AsyncSession = Depends(get_db),
-) -> User:
-    """Requires a valid Bearer JWT token and returns the active User."""
-    if credentials is None or credentials.scheme.lower() != "bearer":
+    db: Session = Depends(get_db),
+) -> CurrentActor:
+    token = _extract_token(request, credentials)
+    if not token:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Authentication required.",
-            headers={"WWW-Authenticate": "Bearer"},
         )
 
     try:
-        payload = decode_access_token(credentials.credentials)
+        payload = decode_access_token(token)
     except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=str(exc),
-            headers={"WWW-Authenticate": "Bearer"},
         ) from exc
 
-    if await AuthService.is_token_revoked(payload.get("jti", "")):
+    role = payload.get("role")
+    email = payload.get("email", "")
+    sub = payload.get("sub")
+
+    if role == "admin":
+        if email != settings.ADMIN_EMAIL.strip().lower() or sub != "admin":
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid admin session.",
+            )
+        return CurrentActor(role="admin", email=email, name="Platform Admin", user=None)
+
+    if role not in (UserRole.ORGANIZER.value, UserRole.PUBLIC.value):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Session has been signed out.",
-            headers={"WWW-Authenticate": "Bearer"},
+            detail="Invalid session role.",
         )
 
     try:
-        user_id = int(payload["sub"])
-    except (KeyError, TypeError, ValueError) as exc:
+        user_id = int(sub)
+    except (TypeError, ValueError) as exc:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid token subject.",
+            detail="Invalid user identifier in token.",
         ) from exc
 
-    user = (await db.execute(select(User).where(User.id == user_id))).scalar_one_or_none()
-    if user is None or not user.is_active:
+    user = db.execute(select(User).where(User.id == user_id)).scalar_one_or_none()
+    if user is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="User account not found or inactive.",
+            detail="Account no longer exists.",
         )
-    return user
+
+    if user.status == UserStatus.BLOCKED:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Your account has been blocked by an administrator.",
+        )
+
+    if user.role.value != role:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Role mismatch.",
+        )
+
+    return CurrentActor(
+        role=user.role.value,
+        email=user.email,
+        name=user.name,
+        user=user,
+    )
+
+
+def require_admin(actor: CurrentActor = Depends(get_current_actor)) -> CurrentActor:
+    if actor.role != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin access required.",
+        )
+    return actor
+
+
+def require_organizer(actor: CurrentActor = Depends(get_current_actor)) -> CurrentActor:
+    if actor.role != UserRole.ORGANIZER.value or actor.user is None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Event Organizer access required.",
+        )
+    return actor
+
+
+def require_public(actor: CurrentActor = Depends(get_current_actor)) -> CurrentActor:
+    if actor.role != UserRole.PUBLIC.value or actor.user is None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="General Public access required.",
+        )
+    return actor

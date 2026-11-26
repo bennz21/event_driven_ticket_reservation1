@@ -1,173 +1,212 @@
 import datetime
 import re
+from decimal import Decimal
 from typing import List, Literal, Optional
-from pydantic import BaseModel, field_validator
-from app.models import SeatStatus, ReservationStatus
 
-_EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+from pydantic import BaseModel, EmailStr, Field, field_validator, model_validator
+
+_BASIC_EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 
-# --- Auth & User Schemas ---
-class UserRegisterRequest(BaseModel):
-    full_name: str
-    email: str
-    password: str
+# --- Auth Schemas ---
+class SignupRequest(BaseModel):
+    name: str = Field(..., min_length=2, max_length=150)
+    email: EmailStr
+    password: str = Field(..., min_length=8, max_length=128)
+    role: Literal["organizer", "public"]
 
-    @field_validator("full_name")
+    @field_validator("name")
     @classmethod
-    def validate_full_name(cls, v: str) -> str:
+    def clean_name(cls, v: str) -> str:
         cleaned = v.strip()
         if len(cleaned) < 2:
-            raise ValueError("Full name must be at least 2 characters.")
+            raise ValueError("Name must be at least 2 characters.")
         return cleaned
 
     @field_validator("email")
     @classmethod
-    def validate_email(cls, v: str) -> str:
-        cleaned = v.strip().lower()
-        if not _EMAIL_RE.match(cleaned):
-            raise ValueError("Please provide a valid email address.")
-        return cleaned
-
-    @field_validator("password")
-    @classmethod
-    def validate_password(cls, v: str) -> str:
-        if len(v) < 8:
-            raise ValueError("Password must be at least 8 characters.")
-        return v
+    def normalize_email(cls, v: EmailStr) -> str:
+        return str(v).strip().lower()
 
 
-class UserLoginRequest(BaseModel):
-    email: str
-    password: str
+class LoginRequest(BaseModel):
+    email: str = Field(..., min_length=3, max_length=255)
+    password: str = Field(..., min_length=1, max_length=128)
 
     @field_validator("email")
     @classmethod
     def normalize_email(cls, v: str) -> str:
-        return v.strip().lower()
+        cleaned = v.strip().lower()
+        if not _BASIC_EMAIL_RE.match(cleaned):
+            raise ValueError("Please provide a valid email address.")
+        return cleaned
 
 
-class UserResponse(BaseModel):
-    id: int
-    email: Optional[str] = None
-    full_name: str
-    auth_provider: str
-    avatar_url: Optional[str] = None
-    created_at: datetime.datetime
-
-    class Config:
-        from_attributes = True
+class AuthIdentity(BaseModel):
+    id: Optional[int] = None
+    name: str
+    email: str
+    role: Literal["admin", "organizer", "public"]
+    status: str = "active"
 
 
-class AuthTokenResponse(BaseModel):
+class AuthResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
-    user: UserResponse
+    user: AuthIdentity
 
 
-class OAuthExchangeRequest(BaseModel):
-    code: str
-
-
-class OAuthDemoRequest(BaseModel):
-    provider: Literal["google", "apple"]
-    email: Optional[str] = None
-    full_name: Optional[str] = None
-
-
-class OAuthProviderStatus(BaseModel):
-    configured: bool
-    demo_enabled: bool
-
-
-class AuthProvidersResponse(BaseModel):
-    google: OAuthProviderStatus
-    apple: OAuthProviderStatus
-
-# --- Event Schemas ---
-class EventBase(BaseModel):
-    title: str
-    description: Optional[str] = ""
-    venue_name: str
-    event_date: datetime.datetime
-    total_rows: int = 6
-    seats_per_row: int = 10
-    base_price: float = 50.0
-
-class EventCreate(EventBase):
-    pass
-
-class EventResponse(EventBase):
+# --- Admin User Management Schemas ---
+class UserAdminResponse(BaseModel):
     id: int
+    name: str
+    email: str
+    role: Literal["organizer", "public"]
+    status: Literal["active", "blocked"]
     created_at: datetime.datetime
 
     class Config:
         from_attributes = True
 
-# --- Seat Schemas ---
+
+class UserStatusUpdate(BaseModel):
+    status: Literal["active", "blocked"]
+
+
+# --- Event & Seat Schemas ---
+class EventUpsertRequest(BaseModel):
+    title: str = Field(..., min_length=3, max_length=200)
+    description: str = Field(..., min_length=5, max_length=5000)
+    event_date: datetime.date
+    event_time: datetime.time
+    venue: str = Field(..., min_length=2, max_length=200)
+    ticket_price: Decimal = Field(..., gt=0, max_digits=10, decimal_places=2)
+    seating_type: Literal["seated", "open"] = "open"
+    total_rows: Optional[int] = Field(default=None, ge=1, le=26)
+    seats_per_row: Optional[int] = Field(default=None, ge=1, le=30)
+    total_tickets: Optional[int] = Field(default=None, ge=1, le=100000)
+
+    @model_validator(mode="after")
+    def validate_seating_config(self) -> "EventUpsertRequest":
+        if self.seating_type == "seated":
+            if self.total_rows is None or self.seats_per_row is None:
+                raise ValueError(
+                    "total_rows and seats_per_row are required for a limited seated event."
+                )
+            self.total_tickets = self.total_rows * self.seats_per_row
+        else:
+            if self.total_tickets is None:
+                raise ValueError("total_tickets is required for an open event.")
+            self.total_rows = None
+            self.seats_per_row = None
+        return self
+
+
+EventCreateRequest = EventUpsertRequest
+EventUpdateRequest = EventUpsertRequest
+
+
 class SeatResponse(BaseModel):
     id: int
     event_id: int
-    row: str
+    row_label: str
     seat_number: int
-    tier: str
-    price: float
-    status: SeatStatus
-    held_by_session_id: Optional[str] = None
-    held_until: Optional[datetime.datetime] = None
-    version: int
+    status: Literal["available", "pending", "booked"]
+    booking_id: Optional[int] = None
 
     class Config:
         from_attributes = True
 
-class SeatHoldRequest(BaseModel):
-    seat_ids: List[int]
-    session_id: str
 
-class SeatReleaseRequest(BaseModel):
-    seat_ids: List[int]
-    session_id: str
+class EventResponse(BaseModel):
+    id: int
+    organizer_id: int
+    organizer_name: Optional[str] = None
+    title: str
+    description: str
+    event_date: datetime.date
+    event_time: datetime.time
+    venue: str
+    ticket_price: float
+    seating_type: Literal["seated", "open"]
+    total_rows: Optional[int] = None
+    seats_per_row: Optional[int] = None
+    total_tickets: int
+    available_tickets: int
+    approval_status: Literal["pending", "approved", "rejected"]
+    created_at: datetime.datetime
+    updated_at: datetime.datetime
 
-class SeatHoldResult(BaseModel):
-    success: bool
-    held_seat_ids: List[int]
-    failed_seat_ids: List[int]
-    held_until: Optional[datetime.datetime] = None
-    message: str
+    class Config:
+        from_attributes = True
 
-# --- Reservation & Ticket Schemas ---
-class ReservationCreate(BaseModel):
-    seat_ids: List[int]
-    session_id: str
-    customer_name: str
-    customer_email: Optional[str] = ""
+
+# --- Booking, Payment & Ticket Schemas ---
+class BookingCreateRequest(BaseModel):
+    event_id: int
+    ticket_count: Optional[int] = Field(default=None, ge=1, le=20)
+    seat_ids: Optional[List[int]] = None
+
+
+class PaymentCheckoutRequest(BaseModel):
+    payment_method: Literal["card", "upi", "netbanking"] = "card"
+    card_last4: Optional[str] = Field(default="4242", max_length=4)
+    simulate_outcome: Literal["success", "failed"] = "success"
+
 
 class TicketResponse(BaseModel):
     id: int
-    seat_id: int
+    booking_id: int
+    event_id: int
+    seat_id: Optional[int] = None
+    seat_label: Optional[str] = None
     ticket_code: str
-    issued_at: datetime.datetime
 
     class Config:
         from_attributes = True
 
-class ReservationResponse(BaseModel):
+
+class PaymentResponse(BaseModel):
     id: int
-    event_id: int
-    user_id: Optional[int] = None
-    customer_name: str
-    customer_email: Optional[str] = ""
-    total_amount: float
-    status: ReservationStatus
-    created_at: datetime.datetime
-    tickets: List[TicketResponse]
+    booking_id: int
+    amount: float
+    status: Literal["pending", "success", "failed", "refunded"]
+    gateway_transaction_id: Optional[str] = None
+    paid_at: Optional[datetime.datetime] = None
 
     class Config:
         from_attributes = True
 
-# --- WebSocket Message ---
-class WSBroadcastMessage(BaseModel):
-    type: str  # e.g., "SEAT_UPDATE", "HOLD_EXPIRED", "NEW_RESERVATION"
+
+class BookingResponse(BaseModel):
+    id: int
+    user_id: int
+    user_name: Optional[str] = None
+    user_email: Optional[str] = None
     event_id: int
-    data: dict
-    timestamp: float
+    event_title: Optional[str] = None
+    event_date: Optional[datetime.date] = None
+    event_time: Optional[datetime.time] = None
+    venue: Optional[str] = None
+    ticket_count: int
+    total_amount: float
+    status: Literal["pending", "confirmed", "cancelled", "failed"]
+    booked_at: datetime.datetime
+    payment: Optional[PaymentResponse] = None
+    tickets: List[TicketResponse] = []
+
+    class Config:
+        from_attributes = True
+
+
+class AdminPaymentDetailResponse(BaseModel):
+    id: int
+    booking_id: int
+    amount: float
+    status: Literal["pending", "success", "failed", "refunded"]
+    gateway_transaction_id: Optional[str] = None
+    paid_at: Optional[datetime.datetime] = None
+    user_name: Optional[str] = None
+    user_email: Optional[str] = None
+    event_title: Optional[str] = None
+    booking_status: str

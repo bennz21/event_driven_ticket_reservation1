@@ -127,7 +127,7 @@ export default function AuthModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-      <div className="bg-[#091224] border border-[#192848] rounded-2xl w-full max-w-md p-6 sm:p-8 shadow-2xl relative">
+      <div className="animate-modal-pop bg-[#091224] border border-[#192848] rounded-2xl w-full max-w-md p-6 sm:p-8 shadow-2xl relative">
         <button
           onClick={onClose}
           aria-label="Close authentication modal"

@@ -28,3 +28,325 @@ code, pre, .font-mono {
 ::-webkit-scrollbar-thumb:hover {
   background: #283f6e;
 }
+
+/* Home page & UI animations */
+@keyframes fadeUpIn {
+  from {
+    opacity: 0;
+    transform: translateY(22px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes modalPopIn {
+  from {
+    opacity: 0;
+    transform: scale(0.94) translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes heroSeatDrift {
+  0% {
+    transform: scale(1.03) translate3d(0, 0, 0);
+  }
+  50% {
+    transform: scale(1.1) translate3d(-16px, -12px, 0);
+  }
+  100% {
+    transform: scale(1.04) translate3d(10px, 6px, 0);
+  }
+}
+
+@keyframes auraPulse {
+  0%, 100% {
+    opacity: 0.4;
+    transform: scale(0.88);
+  }
+  50% {
+    opacity: 0.95;
+    transform: scale(1.22);
+  }
+}
+
+@keyframes sonarRing {
+  0% {
+    transform: scale(0.45);
+    opacity: 0.85;
+  }
+  100% {
+    transform: scale(2.3);
+    opacity: 0;
+  }
+}
+
+@keyframes spotlightSweep {
+  0% {
+    transform: translateX(-35%) rotate(-14deg);
+    opacity: 0.25;
+  }
+  50% {
+    transform: translateX(22%) rotate(-5deg);
+    opacity: 0.72;
+  }
+  100% {
+    transform: translateX(-35%) rotate(-14deg);
+    opacity: 0.25;
+  }
+}
+
+@keyframes streakFly {
+  0% {
+    transform: translate3d(-120px, 80px, 0) rotate(-25deg);
+    opacity: 0;
+  }
+  15% {
+    opacity: 0.9;
+  }
+  70% {
+    opacity: 0.6;
+  }
+  100% {
+    transform: translate3d(520px, -220px, 0) rotate(-25deg);
+    opacity: 0;
+  }
+}
+
+@keyframes textShimmer {
+  0% {
+    background-position: 0% 50%;
+  }
+  100% {
+    background-position: 200% 50%;
+  }
+}
+
+@keyframes underlineSweep {
+  0%, 100% {
+    transform: scaleX(0.25);
+    opacity: 0.45;
+  }
+  50% {
+    transform: scaleX(1);
+    opacity: 1;
+  }
+}
+
+@keyframes particleFloat {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 32px, 0) scale(0.6);
+  }
+  20% {
+    opacity: 0.95;
+  }
+  50% {
+    transform: translate3d(18px, -55px, 0) scale(1.15);
+  }
+  85% {
+    opacity: 0.65;
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(-12px, -155px, 0) scale(1.4);
+  }
+}
+
+@keyframes buttonSheen {
+  0% {
+    transform: translateX(-160%) skewX(-20deg);
+  }
+  38%, 100% {
+    transform: translateX(260%) skewX(-20deg);
+  }
+}
+
+@keyframes ctaGlowPulse {
+  0%, 100% {
+    box-shadow: 0 0 22px rgba(26, 115, 232, 0.5), 0 0 0 0 rgba(38, 132, 255, 0.5);
+  }
+  50% {
+    box-shadow: 0 0 40px rgba(38, 132, 255, 0.88), 0 0 0 10px rgba(38, 132, 255, 0);
+  }
+}
+
+@keyframes arrowNudge {
+  0%, 100% {
+    transform: translateX(0);
+  }
+  50% {
+    transform: translateX(4px);
+  }
+}
+
+@keyframes floatSlow {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-7px);
+  }
+}
+
+@keyframes borderScan {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(220%);
+  }
+}
+
+@keyframes spinSlow {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes tickerSlideIn {
+  0% {
+    opacity: 0;
+    transform: translateY(10px) scale(0.96);
+  }
+  15%, 85% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-10px) scale(0.96);
+  }
+}
+
+@keyframes gridPulse {
+  0%, 100% {
+    opacity: 0.14;
+  }
+  50% {
+    opacity: 0.34;
+  }
+}
+
+@keyframes svgDashFlow {
+  to {
+    stroke-dashoffset: -120;
+  }
+}
+
+.animate-fade-up {
+  opacity: 0;
+  animation: fadeUpIn 0.65s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-modal-pop {
+  animation: modalPopIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-hero-drift {
+  animation: heroSeatDrift 13s ease-in-out infinite alternate;
+}
+
+.animate-aura-pulse {
+  animation: auraPulse 3.6s ease-in-out infinite;
+}
+
+.animate-sonar-ring {
+  animation: sonarRing 3.4s cubic-bezier(0.16, 1, 0.3, 1) infinite;
+}
+
+.animate-spotlight-sweep {
+  animation: spotlightSweep 8s ease-in-out infinite;
+}
+
+.animate-streak {
+  animation: streakFly var(--duration, 6s) linear infinite;
+  animation-delay: var(--delay, 0s);
+}
+
+.animate-text-shimmer {
+  background-size: 200% auto;
+  animation: textShimmer 3s linear infinite;
+}
+
+.animate-underline-sweep {
+  transform-origin: left center;
+  animation: underlineSweep 3.2s ease-in-out infinite;
+}
+
+.animate-particle {
+  animation: particleFloat var(--duration, 6.5s) ease-in-out infinite;
+  animation-delay: var(--delay, 0s);
+}
+
+.animate-btn-sheen {
+  animation: buttonSheen 2.8s ease-in-out infinite;
+}
+
+.animate-cta-glow {
+  animation: ctaGlowPulse 2.3s ease-in-out infinite;
+}
+
+.animate-arrow-nudge {
+  animation: arrowNudge 1.6s ease-in-out infinite;
+}
+
+.animate-float-slow {
+  animation: floatSlow 3.4s ease-in-out infinite;
+}
+
+.animate-border-scan {
+  animation: borderScan 3.4s linear infinite;
+}
+
+.animate-spin-slow {
+  animation: spinSlow 7s linear infinite;
+}
+
+.animate-ticker-slide {
+  animation: tickerSlideIn 2.6s ease-in-out infinite;
+}
+
+.animate-grid-pulse {
+  animation: gridPulse 4.5s ease-in-out infinite;
+}
+
+.animate-svg-flow {
+  stroke-dasharray: 12 18;
+  animation: svgDashFlow 2.6s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-fade-up,
+  .animate-modal-pop {
+    opacity: 1;
+    animation: none;
+  }
+  .animate-hero-drift,
+  .animate-aura-pulse,
+  .animate-sonar-ring,
+  .animate-spotlight-sweep,
+  .animate-streak,
+  .animate-text-shimmer,
+  .animate-underline-sweep,
+  .animate-particle,
+  .animate-btn-sheen,
+  .animate-cta-glow,
+  .animate-arrow-nudge,
+  .animate-float-slow,
+  .animate-border-scan,
+  .animate-spin-slow,
+  .animate-ticker-slide,
+  .animate-grid-pulse,
+  .animate-svg-flow {
+    animation: none;
+  }
+}
