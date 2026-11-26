@@ -63,6 +63,13 @@ class Settings(BaseSettings):
         "http://127.0.0.1:3000",
     ]
 
+    # ── Chatbot / AI ──────────────────────────────────────────────────────────
+    # Get a free key at https://ai.google.dev
+    GEMINI_API_KEY: str = ""
+    # Pinecone (optional — enables RAG; chatbot still works without it)
+    PINECONE_API_KEY: str = ""
+    PINECONE_INDEX_NAME: str = "ticket-chatbot"
+
     model_config = SettingsConfigDict(
         env_file=(str(ROOT_DIR / ".env"), str(BACKEND_DIR / ".env")),
         extra="allow",

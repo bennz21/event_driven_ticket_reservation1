@@ -21,6 +21,7 @@ import {
 } from './api/client';
 import { useEventWebSocket } from './hooks/useEventWebSocket';
 import { Calendar, MapPin, DollarSign, Sparkles } from 'lucide-react';
+import ChatWidget from './components/ChatWidget';
 
 export default function App() {
   const [sessionId, setSessionId] = useState(getSessionId());
@@ -410,6 +411,9 @@ export default function App() {
         onClose={() => setIsMyTicketsOpen(false)}
         user={user}
       />
+
+      {/* AI Chatbot — floating bottom-right */}
+      <ChatWidget />
     </div>
   );
 }

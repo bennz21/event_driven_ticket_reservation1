@@ -9,6 +9,7 @@ from app.core.websocket_manager import ws_manager
 from app.services.background_worker import cleanup_worker
 from app.db.init_db import init_database
 from app.api.v1.router import api_router
+from app.services.pinecone_service import index_events
 
 logging.basicConfig(
     level=logging.INFO,
@@ -43,6 +44,20 @@ async def lifespan(app: FastAPI):
 
     # Start background cleanup worker for expired seat holds
     cleanup_worker.start()
+
+    # Index events into Pinecone for chatbot RAG (non-blocking — runs in background)
+    try:
+        from sqlalchemy import select
+        from app.core.database import AsyncSessionLocal
+        from app.models import Event
+        async with AsyncSessionLocal() as session:
+            result = await session.execute(select(Event))
+            events = result.scalars().all()
+        if events:
+            index_events(events)
+            logger.info("Pinecone: indexed %d event(s) for chatbot RAG.", len(events))
+    except Exception as exc:
+        logger.warning("Pinecone indexing skipped (non-fatal): %s", exc)
 
     logger.info("Application startup complete.")
     yield
