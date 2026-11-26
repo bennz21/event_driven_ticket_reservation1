@@ -2,15 +2,14 @@ import React from 'react';
 import { Lock, Check } from 'lucide-react';
 
 export default function SeatMap({ seats, sessionId, onToggleSeat, isHolding }) {
-  // Group seats by row
   const rows = ['A', 'B', 'C', 'D', 'E', 'F'];
 
   return (
-    <div className="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-6 sm:p-8 backdrop-blur-sm shadow-xl">
+    <div className="bg-[#081021]/90 border border-[#172542] rounded-2xl p-6 sm:p-8 backdrop-blur-sm shadow-xl">
       {/* Stage Graphic */}
       <div className="mb-12 text-center">
-        <div className="w-full max-w-xl mx-auto h-12 bg-gradient-to-b from-indigo-500/20 to-transparent border-t-2 border-indigo-400/80 rounded-t-[80px] flex items-center justify-center shadow-lg shadow-indigo-500/10">
-          <span className="text-xs uppercase tracking-[0.3em] font-semibold text-indigo-300 font-mono">
+        <div className="w-full max-w-xl mx-auto h-12 bg-gradient-to-b from-[#1a73e8]/25 to-transparent border-t-2 border-[#2684ff]/80 rounded-t-[80px] flex items-center justify-center shadow-[0_-4px_24px_rgba(38,132,255,0.18)]">
+          <span className="text-xs uppercase tracking-[0.3em] font-semibold text-[#60a5fa] font-mono">
             STAGE / SCREEN
           </span>
         </div>
@@ -31,13 +30,14 @@ export default function SeatMap({ seats, sessionId, onToggleSeat, isHolding }) {
                   const isReserved = seat.status === 'reserved';
                   const isHeldByMe = seat.status === 'held' && seat.held_by_session_id === sessionId;
                   const isHeldByOther = seat.status === 'held' && seat.held_by_session_id !== sessionId;
-                  const isAvailable = seat.status === 'available';
 
-                  let btnStyle = 'bg-slate-800/80 border-slate-700 text-slate-300 hover:border-emerald-400 hover:bg-emerald-950/30';
+                  let btnStyle =
+                    'bg-[#0c1730] border-[#1d3157] text-slate-300 hover:border-[#2684ff] hover:bg-[#12254a] hover:text-white';
                   if (isReserved) {
-                    btnStyle = 'bg-slate-950/80 border-slate-900 text-slate-700 cursor-not-allowed opacity-50';
+                    btnStyle = 'bg-[#050a18] border-[#111c33] text-slate-700 cursor-not-allowed opacity-50';
                   } else if (isHeldByMe) {
-                    btnStyle = 'bg-indigo-600 border-indigo-400 text-white shadow-lg shadow-indigo-500/30 scale-105 ring-2 ring-indigo-400';
+                    btnStyle =
+                      'bg-[#1a73e8] border-[#60a5fa] text-white shadow-[0_0_16px_rgba(38,132,255,0.5)] scale-105 ring-2 ring-[#3898ff]/70';
                   } else if (isHeldByOther) {
                     btnStyle = 'bg-amber-950/60 border-amber-600/70 text-amber-400 cursor-not-allowed animate-pulse';
                   }
@@ -73,14 +73,14 @@ export default function SeatMap({ seats, sessionId, onToggleSeat, isHolding }) {
       </div>
 
       {/* Legend */}
-      <div className="mt-8 pt-6 border-t border-slate-800 flex flex-wrap items-center justify-center gap-6 text-xs text-slate-400">
+      <div className="mt-8 pt-6 border-t border-[#14203b] flex flex-wrap items-center justify-center gap-6 text-xs text-slate-400">
         <div className="flex items-center space-x-2">
-          <div className="w-4 h-4 rounded bg-slate-800 border border-slate-700" />
+          <div className="w-4 h-4 rounded bg-[#0c1730] border border-[#1d3157]" />
           <span>Available</span>
         </div>
         <div className="flex items-center space-x-2">
-          <div className="w-4 h-4 rounded bg-indigo-600 border border-indigo-400 ring-2 ring-indigo-400/30" />
-          <span className="text-indigo-300 font-medium">Selected by You</span>
+          <div className="w-4 h-4 rounded bg-[#1a73e8] border border-[#60a5fa] ring-2 ring-[#3898ff]/30" />
+          <span className="text-[#60a5fa] font-medium">Selected by You</span>
         </div>
         <div className="flex items-center space-x-2">
           <div className="w-4 h-4 rounded bg-amber-950/80 border border-amber-500 text-amber-400 flex items-center justify-center text-[10px]">
@@ -89,7 +89,7 @@ export default function SeatMap({ seats, sessionId, onToggleSeat, isHolding }) {
           <span className="text-amber-400">Locked by Someone Else</span>
         </div>
         <div className="flex items-center space-x-2">
-          <div className="w-4 h-4 rounded bg-slate-950 border border-slate-900 opacity-60" />
+          <div className="w-4 h-4 rounded bg-[#050a18] border border-[#111c33] opacity-60" />
           <span>Reserved / Sold</span>
         </div>
       </div>

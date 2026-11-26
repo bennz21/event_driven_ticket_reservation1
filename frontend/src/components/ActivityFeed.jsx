@@ -9,7 +9,7 @@ export default function ActivityFeed({ feed }) {
       case 'seat.released':
         return <Unlock className="w-3.5 h-3.5 text-emerald-400" />;
       case 'reservation.confirmed':
-        return <CheckCircle className="w-3.5 h-3.5 text-indigo-400" />;
+        return <CheckCircle className="w-3.5 h-3.5 text-[#3898ff]" />;
       default:
         return <Radio className="w-3.5 h-3.5 text-slate-400" />;
     }
@@ -22,20 +22,20 @@ export default function ActivityFeed({ feed }) {
       case 'seat.released':
         return 'border-emerald-900/40 bg-emerald-950/20 text-emerald-300';
       case 'reservation.confirmed':
-        return 'border-indigo-900/40 bg-indigo-950/20 text-indigo-300';
+        return 'border-[#1d3e7a] bg-[#0b1b3a]/70 text-[#60a5fa]';
       default:
-        return 'border-slate-800 bg-slate-900 text-slate-300';
+        return 'border-[#172542] bg-[#060d1c] text-slate-300';
     }
   };
 
   return (
-    <div className="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-6 backdrop-blur-sm shadow-xl flex flex-col h-[520px]">
-      <div className="flex items-center justify-between pb-4 border-b border-slate-800">
+    <div className="bg-[#081021]/90 border border-[#172542] rounded-2xl p-6 backdrop-blur-sm shadow-xl flex flex-col h-[520px]">
+      <div className="flex items-center justify-between pb-4 border-b border-[#14203b]">
         <div className="flex items-center space-x-2">
-          <Activity className="w-4 h-4 text-indigo-400" />
+          <Activity className="w-4 h-4 text-[#2684ff]" />
           <h3 className="font-semibold text-sm text-white">Live Event Stream</h3>
         </div>
-        <span className="text-[10px] font-mono uppercase px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 animate-pulse">
+        <span className="text-[10px] font-mono uppercase px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 animate-pulse">
           Subscribed
         </span>
       </div>
