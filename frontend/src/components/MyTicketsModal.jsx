@@ -21,7 +21,7 @@ export default function MyTicketsModal({ isOpen, onClose, user }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-xl p-6 sm:p-8 shadow-2xl relative max-h-[85vh] flex flex-col">
+      <div className="bg-[#091224] border border-[#192848] rounded-2xl w-full max-w-xl p-6 sm:p-8 shadow-2xl relative max-h-[85vh] flex flex-col">
         <button
           onClick={onClose}
           aria-label="Close my tickets"
@@ -31,7 +31,7 @@ export default function MyTicketsModal({ isOpen, onClose, user }) {
         </button>
 
         <div className="flex items-center space-x-3 mb-5">
-          <div className="p-2 rounded-lg bg-indigo-600/20 text-indigo-400 border border-indigo-500/30">
+          <div className="p-2 rounded-xl bg-[#1a73e8]/20 text-[#2684ff] border border-[#2684ff]/30">
             <Ticket className="w-5 h-5" />
           </div>
           <div>
@@ -52,7 +52,7 @@ export default function MyTicketsModal({ isOpen, onClose, user }) {
           )}
 
           {!isLoading && !error && reservations.length === 0 && (
-            <div className="text-center py-10 bg-slate-950/50 border border-slate-800 rounded-xl">
+            <div className="text-center py-10 bg-[#060d1c] border border-[#172542] rounded-xl">
               <Ticket className="w-8 h-8 text-slate-600 mx-auto mb-2" />
               <p className="text-sm text-slate-300 font-medium">No confirmed tickets yet</p>
               <p className="text-xs text-slate-500 mt-1">
@@ -64,11 +64,11 @@ export default function MyTicketsModal({ isOpen, onClose, user }) {
           {reservations.map((res) => (
             <div
               key={res.id}
-              className="bg-slate-950/70 border border-slate-800 rounded-xl p-4 space-y-3"
+              className="bg-[#060d1c] border border-[#172542] rounded-xl p-4 space-y-3"
             >
-              <div className="flex items-center justify-between border-b border-slate-800 pb-2.5">
+              <div className="flex items-center justify-between border-b border-[#14203b] pb-2.5">
                 <div>
-                  <span className="text-xs font-mono text-indigo-400 font-semibold">
+                  <span className="text-xs font-mono text-[#60a5fa] font-semibold">
                     Reservation #{res.id}
                   </span>
                   <div className="flex items-center gap-1.5 text-[11px] text-slate-400 mt-0.5">
@@ -85,13 +85,13 @@ export default function MyTicketsModal({ isOpen, onClose, user }) {
                 {res.tickets.map((t) => (
                   <div
                     key={t.id}
-                    className="bg-indigo-950/40 border border-indigo-800/40 rounded-lg px-3 py-2 flex items-center justify-between"
+                    className="bg-[#0b1936] border border-[#1b3568] rounded-lg px-3 py-2 flex items-center justify-between"
                   >
                     <div className="flex items-center gap-2">
-                      <Ticket className="w-4 h-4 text-indigo-400" />
+                      <Ticket className="w-4 h-4 text-[#2684ff]" />
                       <span className="font-mono text-xs text-white">{t.ticket_code}</span>
                     </div>
-                    <QrCode className="w-4 h-4 text-indigo-300" />
+                    <QrCode className="w-4 h-4 text-[#60a5fa]" />
                   </div>
                 ))}
               </div>

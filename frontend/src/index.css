@@ -17,14 +17,14 @@ code, pre, .font-mono {
 }
 
 ::-webkit-scrollbar-track {
-  background: #0f172a;
+  background: #050a18;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #334155;
+  background: #1b2a4a;
   border-radius: 9999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #475569;
+  background: #283f6e;
 }

@@ -7,6 +7,8 @@ import ActivityFeed from './components/ActivityFeed';
 import AuthModal from './components/AuthModal';
 import MyTicketsModal from './components/MyTicketsModal';
 import HomeScreen from './components/HomeScreen';
+import EventInfoModal from './components/EventInfoModal';
+import SupportModal from './components/SupportModal';
 import {
   getSessionId,
   fetchEvents,
@@ -20,7 +22,7 @@ import {
   exchangeOAuthCode,
 } from './api/client';
 import { useEventWebSocket } from './hooks/useEventWebSocket';
-import { Calendar, MapPin, DollarSign, Sparkles } from 'lucide-react';
+import { Calendar, MapPin, DollarSign, Sparkles, RotateCcw, User as UserIcon } from 'lucide-react';
 import ChatWidget from './components/ChatWidget';
 
 export default function App() {
@@ -38,6 +40,8 @@ export default function App() {
   const [authModalMode, setAuthModalMode] = useState('login');
   const [oauthBannerError, setOauthBannerError] = useState('');
   const [isMyTicketsOpen, setIsMyTicketsOpen] = useState(false);
+  const [isEventInfoOpen, setIsEventInfoOpen] = useState(false);
+  const [isSupportOpen, setIsSupportOpen] = useState(false);
   const [activeView, setActiveView] = useState('home');
 
   // Real-time WebSocket hook
@@ -276,40 +280,54 @@ export default function App() {
   const availableSeatsCount = seats.filter((s) => s.status === 'available').length;
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col">
+    <div className="min-h-screen bg-[#050a18] text-slate-100 flex flex-col">
       <Navbar
         isConnected={isConnected}
-        sessionId={sessionId}
-        onResetSession={handleResetSession}
         user={user}
         onOpenAuth={openAuthModal}
         onOpenMyTickets={() => setIsMyTicketsOpen(true)}
+        onOpenEventInfo={() => setIsEventInfoOpen(true)}
+        onOpenSupport={() => setIsSupportOpen(true)}
         onLogout={handleLogout}
         activeView={activeView}
         onNavigate={setActiveView}
       />
 
-      {activeView === 'home' ? (
+      {!user || activeView === 'home' ? (
         <main className="flex-1">
           <HomeScreen
             featuredEvent={currentEvent}
-            availableSeatsCount={availableSeatsCount}
-            totalSeatsCount={seats.length}
             user={user}
             onOpenAuth={openAuthModal}
             onEnterWorkspace={() => setActiveView('workspace')}
+            onOpenEventInfo={() => setIsEventInfoOpen(true)}
+            onOpenMyTickets={() => setIsMyTicketsOpen(true)}
           />
         </main>
       ) : (
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
         {/* Event Header Banner */}
         {currentEvent && (
-          <div className="relative overflow-hidden bg-gradient-to-r from-indigo-900/40 via-purple-900/20 to-slate-900/60 border border-indigo-900/40 rounded-2xl p-6 sm:p-8 backdrop-blur-md">
+          <div className="relative overflow-hidden bg-gradient-to-r from-[#0c1a3a] via-[#091329] to-[#081021] border border-[#192b52] rounded-2xl p-6 sm:p-8 backdrop-blur-md">
             <div className="relative z-10 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
               <div className="space-y-2">
-                <div className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-xs font-semibold">
-                  <Sparkles className="w-3.5 h-3.5" />
-                  <span>Featured Live Event</span>
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full bg-[#1a73e8]/15 border border-[#2684ff]/30 text-[#60a5fa] text-xs font-semibold">
+                    <Sparkles className="w-3.5 h-3.5" />
+                    <span>Featured Live Event</span>
+                  </div>
+                  <div className="inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-full bg-[#060d1c] border border-[#1a2c4f] text-[11px] font-mono text-slate-300">
+                    <UserIcon className="w-3 h-3 text-[#2684ff]" />
+                    <span>{sessionId}</span>
+                    <button
+                      type="button"
+                      onClick={handleResetSession}
+                      title="Switch seat session"
+                      className="text-slate-400 hover:text-white transition-colors"
+                    >
+                      <RotateCcw className="w-3 h-3" />
+                    </button>
+                  </div>
                 </div>
                 <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
                   {currentEvent.title}
@@ -320,11 +338,11 @@ export default function App() {
 
                 <div className="flex flex-wrap items-center gap-4 pt-2 text-xs text-slate-400 font-medium">
                   <div className="flex items-center space-x-1.5">
-                    <MapPin className="w-4 h-4 text-indigo-400" />
+                    <MapPin className="w-4 h-4 text-[#2684ff]" />
                     <span>{currentEvent.venue_name}</span>
                   </div>
                   <div className="flex items-center space-x-1.5">
-                    <Calendar className="w-4 h-4 text-indigo-400" />
+                    <Calendar className="w-4 h-4 text-[#2684ff]" />
                     <span>{new Date(currentEvent.event_date).toLocaleDateString()}</span>
                   </div>
                   <div className="flex items-center space-x-1.5">
@@ -349,7 +367,7 @@ export default function App() {
                 <button
                   disabled={myHeldSeats.length === 0}
                   onClick={() => setIsCheckoutOpen(true)}
-                  className="w-full sm:w-auto px-6 py-3 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold text-sm transition-all shadow-lg shadow-emerald-600/20 flex items-center justify-center space-x-2"
+                  className="w-full sm:w-auto px-6 py-3 rounded-full bg-[#1a73e8] hover:bg-[#2b84f8] disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold text-sm transition-all shadow-[0_0_20px_rgba(26,115,232,0.35)] flex items-center justify-center space-x-2"
                 >
                   <span>Checkout {myHeldSeats.length > 0 ? `(${myHeldSeats.length} Seats)` : ''}</span>
                 </button>
@@ -410,6 +428,24 @@ export default function App() {
         isOpen={isMyTicketsOpen}
         onClose={() => setIsMyTicketsOpen(false)}
         user={user}
+      />
+
+      {/* Event Info Modal */}
+      <EventInfoModal
+        isOpen={isEventInfoOpen}
+        onClose={() => setIsEventInfoOpen(false)}
+        event={currentEvent}
+        availableSeatsCount={availableSeatsCount}
+        totalSeatsCount={seats.length}
+        user={user}
+        onEnterWorkspace={() => setActiveView('workspace')}
+        onOpenAuth={openAuthModal}
+      />
+
+      {/* Support Modal */}
+      <SupportModal
+        isOpen={isSupportOpen}
+        onClose={() => setIsSupportOpen(false)}
       />
 
       {/* AI Chatbot — floating bottom-right */}
