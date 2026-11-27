@@ -26,13 +26,22 @@ from app.schemas import AuthIdentity, AuthResponse, LoginRequest, SignupRequest
 router = APIRouter()
 
 
+def _is_https_or_cross_site() -> bool:
+    return (
+        settings.COOKIE_SECURE
+        or settings.FRONTEND_URL.startswith("https://")
+        or settings.BACKEND_PUBLIC_URL.startswith("https://")
+    )
+
+
 def _set_auth_cookie(response: Response, token: str) -> None:
+    is_secure = _is_https_or_cross_site()
     response.set_cookie(
         key=AUTH_COOKIE_NAME,
         value=token,
         httponly=True,
-        samesite="lax",
-        secure=settings.COOKIE_SECURE,
+        samesite="none" if is_secure else "lax",
+        secure=is_secure,
         max_age=settings.JWT_EXPIRE_MINUTES * 60,
         path="/",
     )
@@ -325,7 +334,10 @@ def google_oauth_callback(
         name=user.name,
         email=user.email,
     )
-    resp = RedirectResponse(url=f"{frontend_base}/{user.role.value}", status_code=status.HTTP_302_FOUND)
+    resp = RedirectResponse(
+        url=f"{frontend_base}/{user.role.value}#oauth_token={jwt_token}",
+        status_code=status.HTTP_302_FOUND,
+    )
     _set_auth_cookie(resp, jwt_token)
     return resp
 
@@ -345,5 +357,11 @@ def get_me(actor: CurrentActor = Depends(get_current_actor)):
 @router.post("/logout")
 def logout(response: Response):
     """Clear the HTTP-only JWT cookie."""
-    response.delete_cookie(key=AUTH_COOKIE_NAME, path="/")
+    is_secure = _is_https_or_cross_site()
+    response.delete_cookie(
+        key=AUTH_COOKIE_NAME,
+        path="/",
+        samesite="none" if is_secure else "lax",
+        secure=is_secure,
+    )
     return {"message": "Signed out."}

@@ -49,15 +49,19 @@ export default function PublicDashboard({ user }) {
   const loadData = useCallback(
     async (q = searchQuery) => {
       setError('');
-      try {
-        const [ev, bk] = await Promise.all([
-          publicBrowseEvents(q),
-          publicFetchBookings(),
-        ]);
-        setEvents(ev);
-        setBookings(bk);
-      } catch (err) {
-        setError(err.message || 'Failed to load events.');
+      const [evRes, bkRes] = await Promise.allSettled([
+        publicBrowseEvents(q),
+        publicFetchBookings(),
+      ]);
+      if (evRes.status === 'fulfilled') {
+        setEvents(evRes.value);
+      } else {
+        setError(evRes.reason?.message || 'Failed to load events.');
+      }
+      if (bkRes.status === 'fulfilled') {
+        setBookings(bkRes.value);
+      } else if (evRes.status === 'fulfilled') {
+        setError(bkRes.reason?.message || 'Failed to load bookings.');
       }
     },
     [searchQuery]

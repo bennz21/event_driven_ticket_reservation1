@@ -1,12 +1,35 @@
 const rawApiUrl = import.meta.env.VITE_API_URL || '';
 const API_BASE = rawApiUrl ? `${rawApiUrl.replace(/\/+$/, '')}/api/v1` : '/api/v1';
+const TOKEN_STORAGE_KEY = 'seatstream_access_token';
+
+export function getAuthToken() {
+  try {
+    return window.localStorage.getItem(TOKEN_STORAGE_KEY) || '';
+  } catch {
+    return '';
+  }
+}
+
+export function setAuthToken(token) {
+  try {
+    if (token) {
+      window.localStorage.setItem(TOKEN_STORAGE_KEY, token);
+    } else {
+      window.localStorage.removeItem(TOKEN_STORAGE_KEY);
+    }
+  } catch {
+    // ignore storage restrictions
+  }
+}
 
 async function apiFetch(path, options = {}) {
   const { headers = {}, ...rest } = options;
+  const token = getAuthToken();
   const res = await fetch(`${API_BASE}${path}`, {
     credentials: 'include',
     headers: {
       ...(options.body ? { 'Content-Type': 'application/json' } : {}),
+      ...(token && !headers.Authorization ? { Authorization: `Bearer ${token}` } : {}),
       ...headers,
     },
     ...rest,
@@ -18,6 +41,9 @@ async function apiFetch(path, options = {}) {
 
   const data = await res.json().catch(() => null);
   if (!res.ok) {
+    if (res.status === 401 && path === '/auth/me') {
+      setAuthToken('');
+    }
     let message = `Request failed (${res.status})`;
     if (data?.detail) {
       message = Array.isArray(data.detail)
@@ -32,18 +58,22 @@ async function apiFetch(path, options = {}) {
 }
 
 // --- Auth ---
-export function signupAccount(payload) {
-  return apiFetch('/auth/signup', {
+export async function signupAccount(payload) {
+  const res = await apiFetch('/auth/signup', {
     method: 'POST',
     body: JSON.stringify(payload),
   });
+  if (res?.access_token) setAuthToken(res.access_token);
+  return res;
 }
 
-export function loginByRole(role, payload) {
-  return apiFetch(`/auth/${role}/login`, {
+export async function loginByRole(role, payload) {
+  const res = await apiFetch(`/auth/${role}/login`, {
     method: 'POST',
     body: JSON.stringify(payload),
   });
+  if (res?.access_token) setAuthToken(res.access_token);
+  return res;
 }
 
 export async function fetchCurrentSession() {
@@ -57,7 +87,8 @@ export async function fetchCurrentSession() {
   }
 }
 
-export function logoutSession() {
+export async function logoutSession() {
+  setAuthToken('');
   return apiFetch('/auth/logout', { method: 'POST' });
 }
 

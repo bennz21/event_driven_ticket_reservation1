@@ -7,7 +7,7 @@ import AdminDashboard from './components/AdminDashboard';
 import OrganizerDashboard from './components/OrganizerDashboard';
 import PublicDashboard from './components/PublicDashboard';
 import ChatWidget from './components/ChatWidget';
-import { fetchCurrentSession, logoutSession } from './api/client';
+import { fetchCurrentSession, logoutSession, setAuthToken } from './api/client';
 
 function roleHomePath(role) {
   if (role === 'admin') return '/admin';
@@ -43,6 +43,13 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    const hash = window.location.hash || '';
+    if (hash.startsWith('#oauth_token=')) {
+      const token = decodeURIComponent(hash.slice('#oauth_token='.length));
+      if (token) setAuthToken(token);
+      window.history.replaceState({}, document.title, window.location.pathname + window.location.search);
+    }
+
     fetchCurrentSession()
       .then((actor) => {
         if (actor) {

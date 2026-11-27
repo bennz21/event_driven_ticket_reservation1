@@ -298,7 +298,8 @@ class PlatformIntegrationTests(unittest.TestCase):
                     follow_redirects=False,
                 )
                 self.assertEqual(cb.status_code, 302)
-                self.assertTrue(cb.headers["location"].endswith("/organizer"))
+                self.assertTrue(cb.headers["location"].split("#")[0].endswith("/organizer"))
+                self.assertIn("#oauth_token=", cb.headers["location"])
                 self.assertIn("access_token=", cb.headers.get("set-cookie", ""))
 
                 # User created in DB as organizer can hit /auth/me via cookie
@@ -525,6 +526,38 @@ class PlatformIntegrationTests(unittest.TestCase):
             self.assertEqual(ok_pay.status_code, 200)
             self.assertEqual(ok_pay.json()["status"], "confirmed")
             self.assertEqual(ok_pay.json()["payment"]["gateway_transaction_id"], "pay_RZP123")
+
+    def test_bearer_token_and_vercel_cors_without_cookies(self) -> None:
+        signup_res = self.client.post(
+            "/api/v1/auth/signup",
+            json={
+                "name": "Cross Origin User",
+                "email": "cross@vercel.app",
+                "password": "Password123!",
+                "role": "public",
+            },
+        )
+        self.assertEqual(signup_res.status_code, 201)
+        token = signup_res.json()["access_token"]
+
+        bearer_client = TestClient(app)
+        me_res = bearer_client.get(
+            "/api/v1/auth/me",
+            headers={
+                "Authorization": f"Bearer {token}",
+                "Origin": "https://event-driven-ticket-reservation1.vercel.app",
+            },
+        )
+        self.assertEqual(me_res.status_code, 200)
+        self.assertEqual(
+            me_res.headers.get("access-control-allow-origin"),
+            "https://event-driven-ticket-reservation1.vercel.app",
+        )
+        bookings_res = bearer_client.get(
+            "/api/v1/public/bookings",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        self.assertEqual(bookings_res.status_code, 200)
 
 
 if __name__ == "__main__":

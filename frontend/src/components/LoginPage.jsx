@@ -63,9 +63,11 @@ export default function LoginPage({ role, externalError = '', onAuthSuccess, onN
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    const cleanedEmail = email.replace(/\s+/g, '').trim().toLowerCase();
+    setEmail(cleanedEmail);
     setIsLoading(true);
     try {
-      const res = await loginByRole(role, { email, password });
+      const res = await loginByRole(role, { email: cleanedEmail, password });
       onAuthSuccess(res.user);
     } catch (err) {
       setError(err.message || 'Sign in failed.');
@@ -148,7 +150,7 @@ export default function LoginPage({ role, externalError = '', onAuthSuccess, onN
                 required
                 placeholder={role === 'admin' ? 'admin@seatstream.com' : 'you@example.com'}
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={(e) => setEmail(e.target.value.replace(/\s+/g, ''))}
                 className="w-full pl-10 pr-3.5 py-2.5 rounded-xl bg-[#060d1c] border border-[#1b2b4d] text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-[#2684ff]"
               />
             </div>

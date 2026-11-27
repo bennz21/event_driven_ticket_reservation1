@@ -41,9 +41,11 @@ export default function SignupPage({ onAuthSuccess, onNavigate }) {
       setError('Password must be at least 8 characters.');
       return;
     }
+    const cleanedEmail = email.replace(/\s+/g, '').trim().toLowerCase();
+    setEmail(cleanedEmail);
     setIsLoading(true);
     try {
-      const res = await signupAccount({ name, email, password, role });
+      const res = await signupAccount({ name: name.trim(), email: cleanedEmail, password, role });
       onAuthSuccess(res.user);
     } catch (err) {
       setError(err.message || 'Signup failed.');
@@ -150,7 +152,7 @@ export default function SignupPage({ onAuthSuccess, onNavigate }) {
                 required
                 placeholder="you@example.com"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={(e) => setEmail(e.target.value.replace(/\s+/g, ''))}
                 className="w-full pl-10 pr-3.5 py-2.5 rounded-xl bg-[#060d1c] border border-[#1b2b4d] text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-[#2684ff]"
               />
             </div>
