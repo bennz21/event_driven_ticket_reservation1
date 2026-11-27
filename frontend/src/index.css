@@ -345,8 +345,227 @@ code, pre, .font-mono {
   .animate-border-scan,
   .animate-spin-slow,
   .animate-ticker-slide,
-  .animate-grid-pulse,
+    .animate-grid-pulse,
   .animate-svg-flow {
     animation: none;
   }
+}
+
+/* =========================================================================
+   Light Mode — Luminous Alabaster & Royal Azure Editorial Theme
+   ========================================================================= */
+html.light body {
+  background-color: #f4f7ff;
+  color: #0b1736;
+  transition: background-color 0.25s ease, color 0.25s ease;
+}
+
+html.light ::-webkit-scrollbar-track {
+  background: #edf2ff;
+}
+
+html.light ::-webkit-scrollbar-thumb {
+  background: #bfd1f5;
+}
+
+html.light ::-webkit-scrollbar-thumb:hover {
+  background: #92b2ee;
+}
+
+/* Primary Page Canvas */
+html.light .bg-\[\#050a18\] {
+  background-color: #f4f7ff;
+}
+
+html.light .bg-\[\#050a18\]\/95 {
+  background-color: rgba(255, 255, 255, 0.88);
+}
+
+html.light .bg-\[\#050a18\]\/70 {
+  background-color: rgba(244, 247, 255, 0.9);
+}
+
+/* Elevated Frosted Surface Cards & Modals */
+html.light .bg-\[\#091224\],
+html.light .bg-\[\#081021\],
+html.light .bg-\[\#081021\]\/90 {
+  background-color: rgba(255, 255, 255, 0.96);
+}
+
+html.light .rounded-2xl.bg-\[\#091224\],
+html.light .rounded-2xl.bg-\[\#081021\],
+html.light .rounded-2xl.bg-\[\#081021\]\/90 {
+  box-shadow: 0 12px 30px -12px rgba(26, 75, 168, 0.14), 0 2px 8px rgba(15, 23, 42, 0.04);
+}
+
+/* Nested Wells, Inputs, Buttons, Table Pills */
+html.light .bg-\[\#060d1c\],
+html.light .bg-\[\#0a1428\],
+html.light .bg-\[\#0a1428\]\/90,
+html.light .bg-\[\#0b162d\],
+html.light .bg-\[\#0b1730\]\/90,
+html.light .bg-\[\#0b1936\],
+html.light .bg-\[\#0c1730\],
+html.light .bg-\[\#0c1830\],
+html.light .bg-\[\#0d1a35\],
+html.light .bg-\[\#0d1c3b\],
+html.light .bg-\[\#0d1d3d\],
+html.light .bg-\[\#0e1b36\] {
+  background-color: #f0f5ff;
+}
+
+html.light .hover\:bg-\[\#11203d\]:hover,
+html.light .hover\:bg-\[\#12254a\]:hover,
+html.light .hover\:bg-\[\#132345\]:hover,
+html.light .hover\:bg-\[\#15284e\]:hover,
+html.light .hover\:bg-\[\#0c162e\]\/60:hover {
+  background-color: #e2ecff;
+}
+
+/* Cool Sapphire Hairline Borders */
+html.light .border-\[\#111c33\],
+html.light .border-\[\#13203d\],
+html.light .border-\[\#14203b\],
+html.light .border-\[\#172542\],
+html.light .border-\[\#192848\],
+html.light .border-\[\#1b2b4d\],
+html.light .border-\[\#1b2f57\],
+html.light .border-\[\#1b3568\],
+html.light .border-\[\#1d3157\],
+html.light .border-\[\#1d3563\],
+html.light .border-\[\#1f345c\],
+html.light .border-\[\#1f3b73\],
+html.light .border-\[\#22355a\],
+html.light .border-\[\#22365c\] {
+  border-color: #d6e3fb;
+}
+
+html.light .divide-\[\#14203b\] > :not([hidden]) ~ :not([hidden]) {
+  border-color: #e2ecfb;
+}
+
+html.light .hover\:border-\[\#2a4980\]:hover,
+html.light .hover\:border-\[\#3898ff\]\/60:hover,
+html.light .hover\:border-\[\#2684ff\]:hover {
+  border-color: #60a5fa;
+}
+
+/* Crisp Ink Typography */
+html.light .text-white,
+html.light .text-slate-100 {
+  color: #0b1736;
+}
+
+html.light .text-slate-200,
+html.light .text-slate-300 {
+  color: #334155;
+}
+
+html.light .text-slate-400 {
+  color: #475569;
+}
+
+html.light .text-slate-500 {
+  color: #64748b;
+}
+
+html.light .hover\:text-white:hover {
+  color: #1a73e8;
+}
+
+/* Keep crisp white ink inside solid colored buttons, chat header, & active seat tiles */
+html.light .bg-\[\#1a73e8\].text-white,
+html.light .bg-\[\#1a73e8\] .text-white,
+html.light .bg-\[\#124596\].text-white,
+html.light .bg-\[\#124596\] .text-white,
+html.light .bg-emerald-600.text-white,
+html.light .bg-emerald-600 .text-white,
+html.light .bg-rose-600.text-white,
+html.light .bg-rose-600 .text-white,
+html.light .keep-white,
+html.light .keep-white .text-white,
+html.light .keep-white.text-white {
+  color: #ffffff;
+}
+
+html.light .bg-\[\#1a73e8\]:hover.text-white,
+html.light .hover\:bg-\[\#2b84f8\]:hover.text-white {
+  color: #ffffff;
+}
+
+/* Saturated Light-Mode Status & Accent Inks */
+html.light .text-\[\#60b5ff\],
+html.light .text-\[\#60a5fa\] {
+  color: #1a73e8;
+}
+
+html.light .text-emerald-400,
+html.light .text-emerald-300 {
+  color: #059669;
+}
+
+html.light .text-amber-300,
+html.light .text-amber-400 {
+  color: #b45309;
+}
+
+html.light .text-rose-300,
+html.light .text-rose-400 {
+  color: #be123c;
+}
+
+html.light .text-sky-400 {
+  color: #0284c7;
+}
+
+/* Alert & Status Containers */
+html.light .bg-rose-950\/70 {
+  background-color: #fff1f2;
+  border-color: #fda4af;
+}
+
+html.light .bg-amber-950\/60,
+html.light .bg-amber-950\/80 {
+  background-color: #fef3c7;
+  border-color: #fcd34d;
+}
+
+html.light .bg-emerald-500\/15 {
+  background-color: #ecfdf5;
+}
+
+html.light .bg-amber-500\/15 {
+  background-color: #fffbeb;
+}
+
+html.light .bg-rose-500\/15 {
+  background-color: #fff1f2;
+}
+
+html.light .bg-\[\#1a73e8\]\/15,
+html.light .bg-\[\#1a73e8\]\/20 {
+  background-color: #eaf2ff;
+}
+
+/* Form Controls & Placeholders */
+html.light input,
+html.light textarea,
+html.light select {
+  color: #0b1736;
+}
+
+html.light input::placeholder,
+html.light textarea::placeholder {
+  color: #94a3b8;
+}
+
+/* Crisp Google OAuth / white buttons on white surfaces */
+html.light button.bg-white {
+  border: 1px solid #cbd5e1;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.06);
+}
+
+/* Light-Mode Backdrop Scrim for Modals */
+html.light .bg-black\/80 {
+  background-color: rgba(15, 23, 42, 0.38);
 }

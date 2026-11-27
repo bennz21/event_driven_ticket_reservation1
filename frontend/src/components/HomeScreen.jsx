@@ -25,7 +25,8 @@ const AMBIENT_PARTICLES = [
   { left: '91%', top: '72%', size: 'w-2 h-2', duration: '6.1s', delay: '1.7s' },
 ];
 
-export default function HomeScreen({ user, onNavigate }) {
+export default function HomeScreen({ user, theme = 'dark', onNavigate }) {
+  const isLight = theme === 'light';
   const [parallax, setParallax] = useState({ x: 0, y: 0, glowX: 65, glowY: 40, active: false });
   const [portalHighlight, setPortalHighlight] = useState(0);
   const [upcomingEvents, setUpcomingEvents] = useState([]);
@@ -125,17 +126,40 @@ export default function HomeScreen({ user, onNavigate }) {
         }}
       />
 
-      {/* Hero Artwork + Sonar Rings */}
+        {/* Hero Artwork + Sonar Rings */}
       <div className="pointer-events-none absolute inset-x-0 top-0 h-[580px] sm:h-[640px] overflow-hidden">
+        {isLight && (
+          <div
+            aria-hidden="true"
+            className="absolute inset-0"
+            style={{
+              background:
+                'radial-gradient(ellipse 68% 72% at 78% 36%, rgba(37, 99, 235, 0.16), rgba(56, 189, 248, 0.11) 45%, transparent 78%)',
+            }}
+          />
+        )}
+
         <div
           className="h-full w-full transition-transform duration-300 ease-out"
-          style={{ transform: `translate3d(${-parallax.x}px, ${-parallax.y}px, 0)` }}
+          style={{
+            transform: `translate3d(${-parallax.x}px, ${-parallax.y}px, 0)`,
+            ...(isLight
+              ? {
+                  WebkitMaskImage:
+                    'radial-gradient(ellipse 64% 82% at 79% 44%, rgba(0,0,0,0.92) 8%, rgba(0,0,0,0.48) 46%, transparent 79%)',
+                  maskImage:
+                    'radial-gradient(ellipse 64% 82% at 79% 44%, rgba(0,0,0,0.92) 8%, rgba(0,0,0,0.48) 46%, transparent 79%)',
+                }
+              : {}),
+          }}
         >
           <img
             src={heroSeatsImg}
             alt=""
             aria-hidden="true"
-            className="h-full w-full object-cover object-right opacity-90 animate-hero-drift will-change-transform"
+            className={`h-full w-full object-cover object-right animate-hero-drift will-change-transform ${
+              isLight ? 'opacity-80 brightness-110 saturate-125' : 'opacity-90'
+            }`}
           />
         </div>
 
@@ -162,12 +186,25 @@ export default function HomeScreen({ user, onNavigate }) {
               '--duration': p.duration,
               '--delay': p.delay,
             }}
-            className={`absolute rounded-full bg-[#7cc4ff] shadow-[0_0_14px_rgba(96,181,255,0.95)] animate-particle ${p.size}`}
+            className={`absolute rounded-full animate-particle ${p.size} ${
+              isLight
+                ? 'bg-[#2563eb]/75 shadow-[0_0_12px_rgba(37,99,235,0.55)]'
+                : 'bg-[#7cc4ff] shadow-[0_0_14px_rgba(96,181,255,0.95)]'
+            }`}
           />
         ))}
 
-        <div className="absolute inset-0 bg-gradient-to-r from-[#050a18] via-[#050a18]/78 to-transparent" />
-        <div className="absolute inset-0 bg-gradient-to-t from-[#050a18] via-transparent to-[#050a18]/30" />
+        {isLight ? (
+          <>
+            <div className="absolute inset-0 bg-gradient-to-r from-[#f4f7ff] via-[#f4f7ff]/86 to-transparent" />
+            <div className="absolute inset-0 bg-gradient-to-t from-[#f4f7ff] via-transparent to-[#f4f7ff]/45" />
+          </>
+        ) : (
+          <>
+            <div className="absolute inset-0 bg-gradient-to-r from-[#050a18] via-[#050a18]/78 to-transparent" />
+            <div className="absolute inset-0 bg-gradient-to-t from-[#050a18] via-transparent to-[#050a18]/30" />
+          </>
+        )}
       </div>
 
       <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-10 pb-14 sm:pt-14 sm:pb-20">
@@ -192,7 +229,13 @@ export default function HomeScreen({ user, onNavigate }) {
             <br />
             without{' '}
             <span className="relative inline-block">
-              <span className="bg-gradient-to-r from-[#2684ff] via-[#a6dbff] to-[#2684ff] bg-clip-text text-transparent animate-text-shimmer">
+              <span
+                className={`bg-clip-text text-transparent animate-text-shimmer ${
+                  isLight
+                    ? 'bg-gradient-to-r from-[#1d4ed8] via-[#0ea5e9] to-[#1d4ed8]'
+                    : 'bg-gradient-to-r from-[#2684ff] via-[#a6dbff] to-[#2684ff]'
+                }`}
+              >
                 race conditions.
               </span>
               <span

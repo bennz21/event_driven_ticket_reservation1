@@ -1,7 +1,7 @@
 import React from 'react';
-import { Armchair, LogOut, Shield, CalendarRange, Ticket, UserPlus, LogIn } from 'lucide-react';
+import { Armchair, LogOut, Shield, CalendarRange, Ticket, UserPlus, LogIn, Sun, Moon } from 'lucide-react';
 
-export default function Navbar({ user, currentPath, onNavigate, onLogout }) {
+export default function Navbar({ user, theme = 'dark', onToggleTheme, currentPath, onNavigate, onLogout }) {
   const roleBadge =
     user?.role === 'admin'
       ? { label: 'Admin', style: 'bg-rose-500/15 text-rose-300 border-rose-500/30', icon: Shield }
@@ -103,7 +103,32 @@ export default function Navbar({ user, currentPath, onNavigate, onLogout }) {
           )}
         </nav>
 
-        <div className="flex items-center space-x-3 shrink-0">
+        <div className="flex items-center space-x-2.5 sm:space-x-3 shrink-0">
+          {onToggleTheme && (
+            <button
+              type="button"
+              onClick={onToggleTheme}
+              aria-label={theme === 'dark' ? 'Switch to Light mode' : 'Switch to Dark mode'}
+              title={theme === 'dark' ? 'Switch to Light mode' : 'Switch to Dark mode'}
+              className={`group flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-semibold transition-all duration-300 ${
+                theme === 'light'
+                  ? 'bg-white hover:bg-blue-50 border-[#d5e3fb] text-[#1e3a8a] shadow-sm'
+                  : 'bg-[#0a1428] hover:bg-[#11203d] border-[#22365c] text-slate-200'
+              }`}
+            >
+              {theme === 'dark' ? (
+                <>
+                  <Sun className="w-3.5 h-3.5 text-amber-400 transition-transform duration-300 group-hover:rotate-45" />
+                  <span className="hidden sm:inline">Light</span>
+                </>
+              ) : (
+                <>
+                  <Moon className="w-3.5 h-3.5 text-[#1a73e8] transition-transform duration-300 group-hover:-rotate-12" />
+                  <span className="hidden sm:inline">Dark</span>
+                </>
+              )}
+            </button>
+          )}
           {user ? (
             <div className="flex items-center space-x-2.5">
               {roleBadge && (

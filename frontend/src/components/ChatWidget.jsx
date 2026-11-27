@@ -105,7 +105,7 @@ export default function ChatWidget() {
           "
         >
           {/* Header */}
-          <div className="flex items-center justify-between px-4 py-3 bg-[#124596] border-b border-[#1f3b73]">
+          <div className="keep-white flex items-center justify-between px-4 py-3 bg-[#124596] border-b border-[#1f3b73]">
             <div className="flex items-center gap-2">
               <Bot size={18} className="text-white" />
               <span className="text-sm font-semibold text-white">Ticket Assistant</span>
