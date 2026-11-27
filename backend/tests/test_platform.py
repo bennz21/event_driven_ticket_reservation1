@@ -559,6 +559,35 @@ class PlatformIntegrationTests(unittest.TestCase):
         )
         self.assertEqual(bookings_res.status_code, 200)
 
+    def test_additive_schema_adds_missing_embedding_hash_non_destructively(self) -> None:
+        from sqlalchemy import inspect, text
+        from app.main import ensure_additive_schema
+
+        tmp_engine = create_engine("sqlite:///:memory:", connect_args={"check_same_thread": False}, poolclass=StaticPool)
+        with tmp_engine.begin() as conn:
+            conn.execute(
+                text(
+                    "CREATE TABLE events (id INTEGER PRIMARY KEY, organizer_id INT NOT NULL, "
+                    "title VARCHAR(200) NOT NULL, description TEXT NOT NULL, event_date DATE NOT NULL, "
+                    "event_time TIME NOT NULL, venue VARCHAR(200) NOT NULL, ticket_price NUMERIC NOT NULL, "
+                    "total_tickets INT NOT NULL, available_tickets INT NOT NULL, approval_status VARCHAR(20) NOT NULL)"
+                )
+            )
+            conn.execute(
+                text(
+                    "INSERT INTO events VALUES (1, 1, 'Keep Me', 'Preserved row', '2026-12-20', '18:00:00', "
+                    "'Hall', 100.0, 50, 50, 'approved')"
+                )
+            )
+        ensure_additive_schema(tmp_engine)
+        cols = {c["name"] for c in inspect(tmp_engine).get_columns("events")}
+        self.assertIn("embedding_hash", cols)
+        self.assertIn("seating_type", cols)
+        with tmp_engine.connect() as conn:
+            row_count = conn.execute(text("SELECT COUNT(*) FROM events")).scalar()
+        self.assertEqual(row_count, 1)
+        tmp_engine.dispose()
+
 
 if __name__ == "__main__":
     unittest.main()
