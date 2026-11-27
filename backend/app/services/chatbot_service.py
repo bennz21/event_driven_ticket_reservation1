@@ -39,6 +39,7 @@ Rules:
 - Be concise and helpful; answer in 2-4 sentences unless more detail is needed
 - When context about specific events is provided, use it; otherwise say you don't have live event details
 - Never invent event names, seat numbers, or prices — only state facts present in the context
+- All ticket prices and amounts are in Indian Rupees (INR / ₹)
 """
 
 

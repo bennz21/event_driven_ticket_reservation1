@@ -357,7 +357,7 @@ export default function HomeScreen({ user, onNavigate }) {
                     <div className="space-y-2">
                       <div className="flex items-center justify-between gap-2">
                         <span className="text-[11px] font-mono text-[#60b5ff]">
-                          ${ev.ticket_price.toFixed(2)}
+                          ₹{ev.ticket_price.toFixed(2)}
                         </span>
                         <span
                           className={`text-[10px] font-mono px-2 py-0.5 rounded-full border ${

@@ -4,7 +4,7 @@ from typing import Literal, Optional
 from urllib.parse import urlencode
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from fastapi.responses import RedirectResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -198,8 +198,26 @@ def public_login(
 
 # --- Google OAuth 2.0 (for General Public & Event Organizer) ---
 
+def _get_google_redirect_uri(request: Request) -> str:
+    explicit = (settings.GOOGLE_REDIRECT_URI or "").strip()
+    if explicit:
+        return explicit
+
+    configured_base = (settings.BACKEND_PUBLIC_URL or "").strip().rstrip("/")
+    if configured_base and configured_base != "http://localhost:8000":
+        return f"{configured_base}{settings.API_V1_STR}/auth/oauth/google/callback"
+
+    proto = request.headers.get("x-forwarded-proto") or request.url.scheme
+    host = request.headers.get("x-forwarded-host") or request.headers.get("host")
+    if host:
+        return f"{proto}://{host}{settings.API_V1_STR}/auth/oauth/google/callback"
+
+    return f"{configured_base or 'http://localhost:8000'}{settings.API_V1_STR}/auth/oauth/google/callback"
+
+
 @router.get("/oauth/google/login")
 def google_oauth_login(
+    request: Request,
     role: Literal["public", "organizer"] = Query(default="public"),
 ):
     if not (settings.GOOGLE_CLIENT_ID and settings.GOOGLE_CLIENT_SECRET):
@@ -209,7 +227,7 @@ def google_oauth_login(
         )
 
     state = create_oauth_state_token(role)
-    redirect_uri = f"{settings.BACKEND_PUBLIC_URL.rstrip('/')}{settings.API_V1_STR}/auth/oauth/google/callback"
+    redirect_uri = _get_google_redirect_uri(request)
     params = {
         "client_id": settings.GOOGLE_CLIENT_ID,
         "redirect_uri": redirect_uri,
@@ -224,6 +242,7 @@ def google_oauth_login(
 
 @router.get("/oauth/google/callback")
 def google_oauth_callback(
+    request: Request,
     code: Optional[str] = Query(default=None),
     state: Optional[str] = Query(default=None),
     error: Optional[str] = Query(default=None),
@@ -246,7 +265,7 @@ def google_oauth_callback(
         return error_redirect(str(exc))
 
     login_path = f"/login/{intended_role}"
-    redirect_uri = f"{settings.BACKEND_PUBLIC_URL.rstrip('/')}{settings.API_V1_STR}/auth/oauth/google/callback"
+    redirect_uri = _get_google_redirect_uri(request)
 
     try:
         with httpx.Client(timeout=10.0) as client:

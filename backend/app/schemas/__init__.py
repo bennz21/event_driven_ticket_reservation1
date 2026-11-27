@@ -149,9 +149,25 @@ class BookingCreateRequest(BaseModel):
 
 
 class PaymentCheckoutRequest(BaseModel):
-    payment_method: Literal["card", "upi", "netbanking"] = "card"
+    payment_method: Literal["card", "upi", "netbanking", "razorpay"] = "razorpay"
     card_last4: Optional[str] = Field(default="4242", max_length=4)
     simulate_outcome: Literal["success", "failed"] = "success"
+    razorpay_payment_id: Optional[str] = Field(default=None, max_length=120)
+    razorpay_order_id: Optional[str] = Field(default=None, max_length=120)
+    razorpay_signature: Optional[str] = Field(default=None, max_length=256)
+
+
+class RazorpayOrderResponse(BaseModel):
+    enabled: bool
+    mode: Literal["server_order", "client_checkout", "simulated"]
+    key_id: Optional[str] = None
+    order_id: Optional[str] = None
+    amount: int
+    currency: str
+    booking_id: int
+    event_title: str
+    prefill_name: str
+    prefill_email: str
 
 
 class TicketResponse(BaseModel):

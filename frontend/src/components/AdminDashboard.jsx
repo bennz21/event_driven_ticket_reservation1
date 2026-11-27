@@ -145,7 +145,7 @@ export default function AdminDashboard() {
           { label: 'Pending Approvals', value: pendingCount, icon: Calendar, color: 'text-amber-400' },
           { label: 'Registered Accounts', value: users.length, icon: Users, color: 'text-[#2684ff]' },
           { label: 'Total Bookings', value: bookings.length, icon: Ticket, color: 'text-emerald-400' },
-          { label: 'Confirmed Revenue', value: `$${totalRevenue.toFixed(2)}`, icon: CreditCard, color: 'text-sky-400' },
+          { label: 'Confirmed Revenue', value: `₹${totalRevenue.toFixed(2)}`, icon: CreditCard, color: 'text-sky-400' },
         ].map((s) => (
           <div key={s.label} className="rounded-2xl bg-[#081021] border border-[#172542] p-4">
             <div className="flex items-center justify-between text-xs text-slate-400">
@@ -233,7 +233,7 @@ export default function AdminDashboard() {
                       <span>Organizer: <strong className="text-slate-200">{ev.organizer_name}</strong></span>
                       <span>Venue: <strong className="text-slate-200">{ev.venue}</strong></span>
                       <span>Date: <strong className="text-slate-200">{ev.event_date} {ev.event_time}</strong></span>
-                      <span>Price: <strong className="text-emerald-400">${ev.ticket_price.toFixed(2)}</strong></span>
+                      <span>Price: <strong className="text-emerald-400">₹{ev.ticket_price.toFixed(2)}</strong></span>
                       <span>Tickets: <strong className="text-white">{ev.available_tickets}/{ev.total_tickets}</strong></span>
                     </div>
                   </div>
@@ -363,7 +363,7 @@ export default function AdminDashboard() {
                     <td className="px-5 py-3.5 text-white">{b.user_name} ({b.user_email})</td>
                     <td className="px-5 py-3.5 text-slate-200">{b.event_title}</td>
                     <td className="px-5 py-3.5 font-mono text-white">{b.ticket_count}</td>
-                    <td className="px-5 py-3.5 font-mono text-emerald-400">${b.total_amount.toFixed(2)}</td>
+                    <td className="px-5 py-3.5 font-mono text-emerald-400">₹{b.total_amount.toFixed(2)}</td>
                     <td className="px-5 py-3.5">
                       <span className={`text-[10px] uppercase font-mono px-2.5 py-0.5 rounded-full border ${STATUS_BADGE[b.status]}`}>
                         {b.status}
@@ -407,7 +407,7 @@ export default function AdminDashboard() {
                     <td className="px-5 py-3.5 font-mono text-[#60b5ff]">#{p.booking_id}</td>
                     <td className="px-5 py-3.5 text-white">{p.user_name}</td>
                     <td className="px-5 py-3.5 text-slate-200">{p.event_title}</td>
-                    <td className="px-5 py-3.5 font-mono text-emerald-400">${p.amount.toFixed(2)}</td>
+                    <td className="px-5 py-3.5 font-mono text-emerald-400">₹{p.amount.toFixed(2)}</td>
                     <td className="px-5 py-3.5">
                       <span className={`text-[10px] uppercase font-mono px-2.5 py-0.5 rounded-full border ${STATUS_BADGE[p.status]}`}>
                         {p.status}

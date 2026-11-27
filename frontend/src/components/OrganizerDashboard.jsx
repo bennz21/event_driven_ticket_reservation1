@@ -310,7 +310,7 @@ export default function OrganizerDashboard() {
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1">Ticket Price ($)</label>
+                <label className="block text-xs font-medium text-slate-300 mb-1">Ticket Price (₹ INR)</label>
                 <input
                   type="number"
                   required
@@ -425,7 +425,7 @@ export default function OrganizerDashboard() {
                     <Calendar className="w-3.5 h-3.5 text-[#2684ff]" />
                     {ev.event_date} {String(ev.event_time).slice(0, 5)}
                   </span>
-                  <span className="text-emerald-400 font-semibold">${ev.ticket_price.toFixed(2)}</span>
+                  <span className="text-emerald-400 font-semibold">₹{ev.ticket_price.toFixed(2)}</span>
                   <span className="font-mono text-white">
                     Available: {ev.available_tickets} / {ev.total_tickets}
                   </span>
@@ -485,7 +485,7 @@ export default function OrganizerDashboard() {
                     <td className="px-5 py-3.5 text-white font-medium">{b.event_title}</td>
                     <td className="px-5 py-3.5 text-slate-300">{b.user_name} ({b.user_email})</td>
                     <td className="px-5 py-3.5 font-mono text-white">{b.ticket_count}</td>
-                    <td className="px-5 py-3.5 font-mono text-emerald-400">${b.total_amount.toFixed(2)}</td>
+                    <td className="px-5 py-3.5 font-mono text-emerald-400">₹{b.total_amount.toFixed(2)}</td>
                     <td className="px-5 py-3.5 uppercase font-mono text-[11px] text-slate-200">{b.status}</td>
                     <td className="px-5 py-3.5 font-mono text-[11px] text-slate-300">
                       {b.tickets.length > 0 ? (

@@ -435,6 +435,97 @@ class PlatformIntegrationTests(unittest.TestCase):
         )
         self.assertEqual(bk_b.status_code, 201)
 
+    def test_razorpay_order_and_payment_signature_flow(self) -> None:
+        org_client = TestClient(app)
+        org_client.post(
+            "/api/v1/auth/signup",
+            json={
+                "name": "RZP Org",
+                "email": "rzp_org@events.com",
+                "password": "Password123!",
+                "role": "organizer",
+            },
+        )
+        future_date = (datetime.date.today() + datetime.timedelta(days=10)).isoformat()
+        ev = org_client.post(
+            "/api/v1/organizer/events",
+            json={
+                "title": "Razorpay Live Show",
+                "description": "Live show for payment verification.",
+                "event_date": future_date,
+                "event_time": "19:00:00",
+                "venue": "Main Hall",
+                "ticket_price": 50.00,
+                "total_tickets": 10,
+            },
+        ).json()
+
+        admin_client = TestClient(app)
+        admin_client.post(
+            "/api/v1/auth/admin/login",
+            json={"email": settings.ADMIN_EMAIL, "password": settings.ADMIN_PASSWORD},
+        )
+        admin_client.post(f"/api/v1/admin/events/{ev['id']}/approve")
+
+        pub_client = TestClient(app)
+        pub_client.post(
+            "/api/v1/auth/signup",
+            json={
+                "name": "RZP Buyer",
+                "email": "rzp_buyer@events.com",
+                "password": "Password123!",
+                "role": "public",
+            },
+        )
+        booking = pub_client.post(
+            "/api/v1/public/bookings",
+            json={"event_id": ev["id"], "ticket_count": 2},
+        ).json()
+
+        with patch.object(settings, "RAZORPAY_API_KEY", "rzp_test_samplekey"), \
+             patch.object(settings, "RAZORPAY_API_SECRET", ""):
+            order_res = pub_client.post(f"/api/v1/public/bookings/{booking['id']}/razorpay-order")
+            self.assertEqual(order_res.status_code, 200)
+            order_json = order_res.json()
+            self.assertTrue(order_json["enabled"])
+            self.assertEqual(order_json["mode"], "client_checkout")
+            self.assertEqual(order_json["key_id"], "rzp_test_samplekey")
+            self.assertEqual(order_json["amount"], 10000)
+
+        import hashlib
+        import hmac
+
+        with patch.object(settings, "RAZORPAY_API_KEY", "rzp_test_samplekey"), \
+             patch.object(settings, "RAZORPAY_API_SECRET", "secret_test_123"):
+            bad_pay = pub_client.post(
+                f"/api/v1/public/bookings/{booking['id']}/pay",
+                json={
+                    "payment_method": "razorpay",
+                    "simulate_outcome": "success",
+                    "razorpay_payment_id": "pay_RZP123",
+                    "razorpay_order_id": "order_RZP123",
+                    "razorpay_signature": "bad_sig",
+                },
+            )
+            self.assertEqual(bad_pay.status_code, 400)
+
+            valid_sig = hmac.new(
+                b"secret_test_123", b"order_RZP123|pay_RZP123", hashlib.sha256
+            ).hexdigest()
+            ok_pay = pub_client.post(
+                f"/api/v1/public/bookings/{booking['id']}/pay",
+                json={
+                    "payment_method": "razorpay",
+                    "simulate_outcome": "success",
+                    "razorpay_payment_id": "pay_RZP123",
+                    "razorpay_order_id": "order_RZP123",
+                    "razorpay_signature": valid_sig,
+                },
+            )
+            self.assertEqual(ok_pay.status_code, 200)
+            self.assertEqual(ok_pay.json()["status"], "confirmed")
+            self.assertEqual(ok_pay.json()["payment"]["gateway_transaction_id"], "pay_RZP123")
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -948,7 +948,7 @@ def format_events_for_context(events: Sequence[Event]) -> str:
         short_desc = _normalize_whitespace(e.description)[:200]
         lines.append(
             f"Event: {e.title} at venue '{e.venue}'. Date: {date_str} {e.event_time}. "
-            f"Price: ${float(e.ticket_price):.2f}. Format: {seating_desc}. "
+            f"Price: ₹{float(e.ticket_price):.2f} INR. Format: {seating_desc}. "
             f"Available: {e.available_tickets}/{e.total_tickets}. Summary: {short_desc}"
         )
     return "\n".join(lines)

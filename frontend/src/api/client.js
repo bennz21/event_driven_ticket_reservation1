@@ -147,6 +147,12 @@ export function publicCreateBooking(payload) {
   });
 }
 
+export function publicCreateRazorpayOrder(bookingId) {
+  return apiFetch(`/public/bookings/${bookingId}/razorpay-order`, {
+    method: 'POST',
+  });
+}
+
 export function publicPayBooking(bookingId, payload) {
   return apiFetch(`/public/bookings/${bookingId}/pay`, {
     method: 'POST',

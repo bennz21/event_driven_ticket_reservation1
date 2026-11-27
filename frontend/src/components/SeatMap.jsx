@@ -47,7 +47,7 @@ export default function SeatMap({ seats, sessionId, onToggleSeat, isHolding }) {
                       key={seat.id}
                       disabled={isReserved || isHeldByOther || isHolding}
                       onClick={() => onToggleSeat(seat)}
-                      title={`Seat ${seat.row}${seat.seat_number} - ${seat.tier} - $${seat.price} (${seat.status})`}
+                      title={`Seat ${seat.row}${seat.seat_number} - ${seat.tier} - ₹${seat.price} (${seat.status})`}
                       className={`relative w-8 h-8 sm:w-10 sm:h-10 rounded-lg border text-xs font-mono font-medium flex items-center justify-center transition-all duration-200 select-none ${btnStyle}`}
                     >
                       {isReserved ? (

@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, Calendar, MapPin, DollarSign, Ticket, ArrowRight, Sparkles } from 'lucide-react';
+import { X, Calendar, MapPin, IndianRupee, Ticket, ArrowRight, Sparkles } from 'lucide-react';
 
 export default function EventInfoModal({
   isOpen,
@@ -71,7 +71,7 @@ export default function EventInfoModal({
 
         <div className="mt-5 rounded-xl bg-[#060d1c] border border-[#172542] p-4 space-y-2.5">
           <div className="text-xs font-semibold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
-            <DollarSign className="w-3.5 h-3.5 text-[#2684ff]" />
+            <IndianRupee className="w-3.5 h-3.5 text-[#2684ff]" />
             <span>Seating Tiers</span>
           </div>
           {tiers.map((tier) => (
@@ -80,7 +80,7 @@ export default function EventInfoModal({
               className="flex items-center justify-between text-sm border-t border-[#14203b] pt-2 first:border-t-0 first:pt-0"
             >
               <span className="text-slate-300">{tier.name}</span>
-              <span className="font-mono font-semibold text-white">${tier.price}</span>
+              <span className="font-mono font-semibold text-white">₹{tier.price}</span>
             </div>
           ))}
         </div>

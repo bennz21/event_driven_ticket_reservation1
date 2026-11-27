@@ -17,6 +17,7 @@ import {
   publicBrowseEvents,
   publicCancelBooking,
   publicCreateBooking,
+  publicCreateRazorpayOrder,
   publicFetchBookingDetail,
   publicFetchBookings,
   publicFetchEventSeats,
@@ -41,7 +42,6 @@ export default function PublicDashboard({ user }) {
   const [selectedSeatIds, setSelectedSeatIds] = useState([]);
   const [ticketCount, setTicketCount] = useState(1);
   const [activeBooking, setActiveBooking] = useState(null);
-  const [paymentMethod, setPaymentMethod] = useState('card');
   const [ticketModalBooking, setTicketModalBooking] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
@@ -153,20 +153,115 @@ export default function PublicDashboard({ user }) {
     }
   };
 
-  const handlePayment = async (simulateOutcome) => {
+  const ensureRazorpayScript = () =>
+    new Promise((resolve) => {
+      if (window.Razorpay) {
+        resolve(true);
+        return;
+      }
+      const script = document.createElement('script');
+      script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+      script.onload = () => resolve(true);
+      script.onerror = () => resolve(false);
+      document.body.appendChild(script);
+    });
+
+  const handleRazorpayCheckout = async () => {
+    if (!activeBooking) return;
+    setSubmitting(true);
+    setError('');
+    try {
+      const order = await publicCreateRazorpayOrder(activeBooking.id);
+      if (order.enabled) {
+        const loaded = await ensureRazorpayScript();
+        if (!loaded || !window.Razorpay) {
+          throw new Error('Could not load Razorpay Checkout SDK. Check your internet connection.');
+        }
+
+        const options = {
+          key: order.key_id,
+          amount: order.amount,
+          currency: order.currency,
+          ...(order.order_id ? { order_id: order.order_id } : {}),
+          name: 'SeatStream',
+          description: `Booking #${order.booking_id} — ${order.event_title}`,
+          prefill: {
+            name: user?.name || order.prefill_name || '',
+            email: user?.email || order.prefill_email || '',
+          },
+          theme: { color: '#1a73e8' },
+          modal: {
+            ondismiss: () => setSubmitting(false),
+          },
+          handler: async (response) => {
+            setSubmitting(true);
+            setError('');
+            try {
+              const updated = await publicPayBooking(activeBooking.id, {
+                payment_method: 'razorpay',
+                simulate_outcome: 'success',
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_order_id: response.razorpay_order_id || null,
+                razorpay_signature: response.razorpay_signature || null,
+              });
+              setActiveBooking(updated);
+              await loadData(searchQuery);
+            } catch (err) {
+              setError(err.message || 'Payment verification failed.');
+            } finally {
+              setSubmitting(false);
+            }
+          },
+        };
+
+        const rzp = new window.Razorpay(options);
+        rzp.on('payment.failed', async (response) => {
+          const reason = response?.error?.description || 'Razorpay payment failed.';
+          setError(reason);
+          try {
+            const failed = await publicPayBooking(activeBooking.id, {
+              payment_method: 'razorpay',
+              simulate_outcome: 'failed',
+              razorpay_payment_id: response?.error?.metadata?.payment_id || null,
+            });
+            setActiveBooking(failed);
+            await loadData(searchQuery);
+          } catch {
+            // keep existing error displayed
+          } finally {
+            setSubmitting(false);
+          }
+        });
+        rzp.open();
+        return;
+      }
+
+      const updated = await publicPayBooking(activeBooking.id, {
+        payment_method: 'razorpay',
+        simulate_outcome: 'success',
+      });
+      setActiveBooking(updated);
+      await loadData(searchQuery);
+      setSubmitting(false);
+    } catch (err) {
+      setError(err.message || 'Could not initialize Razorpay checkout.');
+      setSubmitting(false);
+    }
+  };
+
+  const handleFailPayment = async () => {
     if (!activeBooking) return;
     setSubmitting(true);
     setError('');
     try {
       const updated = await publicPayBooking(activeBooking.id, {
-        payment_method: paymentMethod,
-        card_last4: '4242',
-        simulate_outcome: simulateOutcome,
+        payment_method: 'razorpay',
+        simulate_outcome: 'failed',
       });
       setActiveBooking(updated);
       await loadData(searchQuery);
     } catch (err) {
-      setError(err.message || 'Payment failed.');
+      setError(err.message || 'Could not release tickets.');
     } finally {
       setSubmitting(false);
     }
@@ -204,7 +299,7 @@ export default function PublicDashboard({ user }) {
       ...booking.tickets.map(
         (t, i) => `  ${i + 1}. ${t.seat_label ? `Seat ${t.seat_label} — ` : ''}${t.ticket_code}`
       ),
-      `Total Paid: $${booking.total_amount.toFixed(2)}`,
+      `Total Paid: ₹${booking.total_amount.toFixed(2)}`,
       `Transaction ID: ${booking.payment?.gateway_transaction_id || 'N/A'}`,
       `Status: ${booking.status.toUpperCase()}`,
     ];
@@ -326,7 +421,7 @@ export default function PublicDashboard({ user }) {
                     <div>
                       <div className="text-[11px] text-slate-400">Ticket Price</div>
                       <div className="text-lg font-extrabold font-mono text-emerald-400">
-                        ${ev.ticket_price.toFixed(2)}
+                        ₹{ev.ticket_price.toFixed(2)}
                       </div>
                     </div>
                     <button
@@ -378,7 +473,7 @@ export default function PublicDashboard({ user }) {
                     <span>Venue: <strong className="text-slate-200">{b.venue}</strong></span>
                     <span>Event Date: <strong className="text-slate-200">{b.event_date} {String(b.event_time || '').slice(0, 5)}</strong></span>
                     <span>Qty: <strong className="text-white font-mono">{b.ticket_count}</strong></span>
-                    <span>Total: <strong className="text-emerald-400 font-mono">${b.total_amount.toFixed(2)}</strong></span>
+                    <span>Total: <strong className="text-emerald-400 font-mono">₹{b.total_amount.toFixed(2)}</strong></span>
                     {b.tickets?.some((t) => t.seat_label) && (
                       <span>
                         Seats:{' '}
@@ -571,7 +666,7 @@ export default function PublicDashboard({ user }) {
                       <div className="text-right">
                         <div className="text-slate-400">Total</div>
                         <div className="font-mono font-bold text-emerald-400 text-sm">
-                          ${(selectedSeatIds.length * Number(selectedEvent.ticket_price)).toFixed(2)}
+                          ₹{(selectedSeatIds.length * Number(selectedEvent.ticket_price)).toFixed(2)}
                         </div>
                       </div>
                     </div>
@@ -592,7 +687,7 @@ export default function PublicDashboard({ user }) {
                       <div className="flex justify-between">
                         <span className="text-slate-400">Price per ticket</span>
                         <span className="font-mono text-white">
-                          ${Number(selectedEvent.ticket_price).toFixed(2)}
+                          ₹{Number(selectedEvent.ticket_price).toFixed(2)}
                         </span>
                       </div>
                       <div className="flex justify-between">
@@ -616,7 +711,7 @@ export default function PublicDashboard({ user }) {
                           .filter((n) => n <= selectedEvent.available_tickets)
                           .map((n) => (
                             <option key={n} value={n}>
-                              {n} {n === 1 ? 'Ticket' : 'Tickets'} — $
+                              {n} {n === 1 ? 'Ticket' : 'Tickets'} — ₹
                               {(n * Number(selectedEvent.ticket_price)).toFixed(2)}
                             </option>
                           ))}
@@ -648,41 +743,32 @@ export default function PublicDashboard({ user }) {
                 <div className="rounded-xl bg-[#060d1c] border border-[#172542] p-4 flex justify-between items-center text-sm">
                   <span className="text-slate-300">{activeBooking.ticket_count} Ticket(s)</span>
                   <span className="text-emerald-400 font-mono font-bold text-base">
-                    ${activeBooking.total_amount.toFixed(2)}
+                    ₹{activeBooking.total_amount.toFixed(2)}
                   </span>
                 </div>
 
-                <div>
-                  <label className="block text-xs font-medium text-slate-300 mb-1.5">
-                    Payment Method
-                  </label>
-                  <select
-                    value={paymentMethod}
-                    onChange={(e) => setPaymentMethod(e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-[#060d1c] border border-[#1b2b4d] text-sm text-white"
-                  >
-                    <option value="card">Credit / Debit Card</option>
-                    <option value="upi">UPI Instant Pay</option>
-                    <option value="netbanking">NetBanking</option>
-                  </select>
+                <div className="rounded-xl bg-[#060d1c] border border-[#172542] p-3.5 text-xs text-slate-400">
+                  Pay securely via <span className="text-white font-semibold">Razorpay Checkout</span> (Cards, UPI, NetBanking &amp; Wallets).
                 </div>
 
                 <div className="space-y-2.5 pt-1">
                   <button
                     type="button"
                     disabled={submitting}
-                    onClick={() => handlePayment('success')}
+                    onClick={handleRazorpayCheckout}
                     className="w-full py-3 rounded-full bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-sm disabled:opacity-50"
                   >
-                    {submitting ? 'Processing...' : `Pay $${activeBooking.total_amount.toFixed(2)} (Confirm)`}
+                    {submitting
+                      ? 'Opening Razorpay...'
+                      : `Pay ₹${activeBooking.total_amount.toFixed(2)} with Razorpay`}
                   </button>
                   <button
                     type="button"
                     disabled={submitting}
-                    onClick={() => handlePayment('failed')}
+                    onClick={handleFailPayment}
                     className="w-full py-2.5 rounded-full bg-rose-600/20 hover:bg-rose-600/35 border border-rose-500/40 text-rose-300 font-semibold text-xs disabled:opacity-50"
                   >
-                    Simulate Payment Failure (Release Tickets)
+                    Cancel Payment (Release Held Tickets)
                   </button>
                 </div>
               </div>

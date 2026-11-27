@@ -77,7 +77,7 @@ export default function MyTicketsModal({ isOpen, onClose, user }) {
                   </div>
                 </div>
                 <span className="text-emerald-400 font-mono text-sm font-bold">
-                  ${res.total_amount.toFixed(2)}
+                  ₹{res.total_amount.toFixed(2)}
                 </span>
               </div>
 

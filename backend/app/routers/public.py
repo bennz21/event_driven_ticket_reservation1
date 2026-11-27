@@ -1,8 +1,11 @@
 import datetime
+import hashlib
+import hmac
 import uuid
 from decimal import Decimal
 from typing import List, Optional
 
+import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session, joinedload
@@ -28,6 +31,7 @@ from app.schemas import (
     BookingResponse,
     EventResponse,
     PaymentCheckoutRequest,
+    RazorpayOrderResponse,
     SeatResponse,
 )
 from app.services.pinecone_service import (
@@ -337,6 +341,101 @@ def create_booking(
     return serialize_booking(_fetch_full_booking(db, booking.id))
 
 
+@router.post("/bookings/{booking_id}/razorpay-order", response_model=RazorpayOrderResponse)
+def create_razorpay_order(
+    booking_id: int,
+    actor: CurrentActor = Depends(require_public),
+    db: Session = Depends(get_db),
+):
+    """
+    Prepare a Razorpay checkout session for a pending booking using RAZORPAY_API_KEY.
+    If RAZORPAY_API_SECRET is also configured, creates a server-side Razorpay Order via REST API.
+    """
+    booking = (
+        db.execute(
+            select(Booking)
+            .options(joinedload(Booking.event))
+            .where(Booking.id == booking_id, Booking.user_id == actor.id)
+        )
+        .unique()
+        .scalar_one_or_none()
+    )
+    if booking is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Booking not found.")
+    if booking.status != BookingStatus.PENDING:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Booking is already {booking.status.value}.",
+        )
+
+    key_id = (settings.RAZORPAY_API_KEY or "").strip()
+    key_secret = (settings.RAZORPAY_API_SECRET or "").strip()
+    currency = (settings.RAZORPAY_CURRENCY or "INR").strip().upper()
+    amount_subunits = max(100, int(round(float(booking.total_amount) * 100)))
+    event_title = booking.event.title if booking.event else f"Booking #{booking.id}"
+
+    if not key_id:
+        return RazorpayOrderResponse(
+            enabled=False,
+            mode="simulated",
+            key_id=None,
+            order_id=None,
+            amount=amount_subunits,
+            currency=currency,
+            booking_id=booking.id,
+            event_title=event_title,
+            prefill_name=actor.name,
+            prefill_email=actor.email,
+        )
+
+    order_id = None
+    mode = "client_checkout"
+    if key_secret:
+        try:
+            with httpx.Client(timeout=12.0) as client:
+                resp = client.post(
+                    "https://api.razorpay.com/v1/orders",
+                    auth=(key_id, key_secret),
+                    json={
+                        "amount": amount_subunits,
+                        "currency": currency,
+                        "receipt": f"booking_{booking.id}",
+                        "notes": {
+                            "booking_id": str(booking.id),
+                            "event_id": str(booking.event_id),
+                        },
+                    },
+                )
+            if resp.status_code in (200, 201):
+                order_id = resp.json().get("id")
+                mode = "server_order"
+            else:
+                raise HTTPException(
+                    status_code=status.HTTP_502_BAD_GATEWAY,
+                    detail=f"Razorpay order creation failed ({resp.status_code}).",
+                )
+        except HTTPException:
+            raise
+        except Exception as exc:
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail=f"Could not reach Razorpay API: {exc}",
+            ) from exc
+
+    return RazorpayOrderResponse(
+        enabled=True,
+        mode=mode,
+        key_id=key_id,
+        order_id=order_id,
+        amount=amount_subunits,
+        currency=currency,
+        booking_id=booking.id,
+        event_title=event_title,
+        prefill_name=actor.name,
+        prefill_email=actor.email,
+    )
+
+
 @router.post("/bookings/{booking_id}/pay", response_model=BookingResponse)
 def pay_for_booking(
     booking_id: int,
@@ -345,8 +444,9 @@ def pay_for_booking(
     db: Session = Depends(get_db),
 ):
     """
-    Process payment gateway transaction for a pending booking.
-    On success: confirms booking, marks selected seats as booked, and issues tickets.
+    Process payment gateway transaction (Razorpay Checkout or fallback) for a pending booking.
+    On success: verifies Razorpay signature when order+secret exist, confirms booking,
+    marks selected seats as booked, and issues tickets.
     On failure: releases held seats and restores event available_tickets.
     """
     try:
@@ -388,7 +488,11 @@ def pay_for_booking(
         now = datetime.datetime.utcnow()
         if req.simulate_outcome == "failed":
             payment.status = PaymentStatus.FAILED
-            payment.gateway_transaction_id = f"GW-FAIL-{uuid.uuid4().hex[:10].upper()}"
+            payment.gateway_transaction_id = (
+                req.razorpay_payment_id.strip()
+                if req.razorpay_payment_id and req.razorpay_payment_id.strip()
+                else f"GW-FAIL-{uuid.uuid4().hex[:10].upper()}"
+            )
             payment.paid_at = now
             booking.status = BookingStatus.FAILED
             event.available_tickets = min(
@@ -400,10 +504,31 @@ def pay_for_booking(
                 seat.booking_id = None
             db.commit()
         else:
-            payment.status = PaymentStatus.SUCCESS
-            payment.gateway_transaction_id = (
-                f"GW-{req.payment_method.upper()}-{uuid.uuid4().hex[:10].upper()}"
+            key_secret = (settings.RAZORPAY_API_SECRET or "").strip()
+            if req.razorpay_order_id and key_secret:
+                if not req.razorpay_payment_id or not req.razorpay_signature:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="Missing Razorpay payment signature details.",
+                    )
+                expected_sig = hmac.new(
+                    key_secret.encode("utf-8"),
+                    f"{req.razorpay_order_id}|{req.razorpay_payment_id}".encode("utf-8"),
+                    hashlib.sha256,
+                ).hexdigest()
+                if not hmac.compare_digest(expected_sig, req.razorpay_signature):
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="Razorpay payment signature verification failed.",
+                    )
+
+            txn_id = (
+                req.razorpay_payment_id.strip()
+                if req.razorpay_payment_id and req.razorpay_payment_id.strip()
+                else f"GW-{req.payment_method.upper()}-{uuid.uuid4().hex[:10].upper()}"
             )
+            payment.status = PaymentStatus.SUCCESS
+            payment.gateway_transaction_id = txn_id
             payment.paid_at = now
             booking.status = BookingStatus.CONFIRMED
 

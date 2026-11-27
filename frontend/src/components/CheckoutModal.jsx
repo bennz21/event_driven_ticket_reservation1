@@ -72,7 +72,7 @@ export default function CheckoutModal({
               </div>
               <div className="flex justify-between border-b border-[#14203b] pb-2">
                 <span className="text-slate-400">Total Paid</span>
-                <span className="text-emerald-400 font-bold">${completedReservation.total_amount.toFixed(2)}</span>
+                <span className="text-emerald-400 font-bold">₹{completedReservation.total_amount.toFixed(2)}</span>
               </div>
 
               <div className="pt-2">
@@ -129,13 +129,13 @@ export default function CheckoutModal({
                     key={s.id}
                     className="px-2.5 py-1 rounded-lg bg-[#0d1d3d] border border-[#1f3b73] text-[#60a5fa] text-xs font-mono font-medium"
                   >
-                    {s.row}{s.seat_number} (${s.price})
+                    {s.row}{s.seat_number} (₹{s.price})
                   </span>
                 ))}
               </div>
               <div className="pt-3 border-t border-[#14203b] flex justify-between items-center text-sm font-medium">
                 <span className="text-slate-300">Total Price:</span>
-                <span className="text-emerald-400 font-mono text-base font-bold">${total.toFixed(2)}</span>
+                <span className="text-emerald-400 font-mono text-base font-bold">₹{total.toFixed(2)}</span>
               </div>
             </div>
 
@@ -171,7 +171,7 @@ export default function CheckoutModal({
                   disabled={isSubmitting}
                   className="w-full py-3 rounded-full bg-[#1a73e8] hover:bg-[#2b84f8] text-white font-semibold text-sm transition-all shadow-[0_0_20px_rgba(26,115,232,0.35)] disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {isSubmitting ? 'Confirming with Event Bus...' : `Confirm & Pay $${total.toFixed(2)}`}
+                  {isSubmitting ? 'Confirming with Event Bus...' : `Confirm & Pay ₹${total.toFixed(2)}`}
                 </button>
               </div>
             </form>
